@@ -333,12 +333,12 @@
 
         <div id="item-titles-container" style="margin-bottom: 15px;"></div>
 
-        <button class="btn" onclick="startCupTasting()">產生評分連結與 QR Code</button>
+        <button type="button" class="btn" onclick="startCupTasting()">產生評分連結與 QR Code</button>
 
         <div id="qr-container" class="hidden" style="margin-top: 20px; text-align: center;">
             <h3>請學生掃描 QR Code 開始評分</h3>
             <div id="qrcode"></div>
-            <button class="btn btn-add" onclick="goToStudentPage()">直接進入評分頁面</button>
+            <button type="button" class="btn btn-add" onclick="goToStudentPage()">直接進入評分頁面</button>
         </div>
 
         <div class="footer-credit">2026.08 社大版 徐瑞玲老師編表</div>
@@ -356,9 +356,9 @@
                 <label for="student-name" style="margin:0; white-space: nowrap;"><strong>姓名 <span style="color:red;">*</span>：</strong></label>
                 <input type="text" id="student-name" placeholder="請輸入姓名 (必填)" style="width: 200px; padding: 6px 8px;">
             </div>
-            <!-- 第三列：填表日期 -->
+            <!-- 第三列：日期 -->
             <div class="header-info-row">
-                <strong>填表日期：</strong><span id="display-date"></span>
+                <strong>日期：</strong><span id="display-date"></span>
             </div>
         </div>
 
@@ -367,7 +367,7 @@
         <div id="items-container"></div>
 
         <div style="margin-top: 20px;">
-            <button class="btn btn-print" onclick="showHtmlResult()">📱 顯示結果</button>
+            <button type="button" class="btn btn-print" onclick="showHtmlResult()">📱 顯示結果</button>
         </div>
 
         <div class="footer-credit">2026.08 社大版 徐瑞玲老師編表</div>
@@ -375,7 +375,7 @@
 
     <!-- 步驟 3：HTML 評分結果畫面 (可直接下載/產圖) -->
     <div id="result-section" class="card hidden">
-        <!-- 欲導出圖檔的內容區域 (已移除內部的標註文字) -->
+        <!-- 欲導出圖檔的內容區域 -->
         <div id="export-area" style="padding: 10px; background: #ffffff;">
             <div class="header-info-container">
                 <!-- 第一列：主題 -->
@@ -386,9 +386,9 @@
                 <div class="header-info-row">
                     <strong>姓名：</strong><span id="result-display-name" style="font-size:16px; font-weight:bold;"></span>
                 </div>
-                <!-- 第三列：填表日期 -->
+                <!-- 第三列：日期 -->
                 <div class="header-info-row">
-                    <strong>填表日期：</strong><span id="result-display-date"></span>
+                    <strong>日期：</strong><span id="result-display-date"></span>
                 </div>
             </div>
 
@@ -420,8 +420,8 @@
         </div>
 
         <div style="margin-top: 20px; display: flex; gap: 10px;">
-            <button class="btn btn-jpg" onclick="downloadResultJPG()">🖼️ 下載 JPG 圖片</button>
-            <button class="btn btn-secondary" onclick="backToRating()">✏️ 返回修改評分</button>
+            <button type="button" class="btn btn-jpg" onclick="downloadResultJPG()">🖼️ 下載 JPG 圖片</button>
+            <button type="button" class="btn btn-secondary" onclick="backToRating()">✏️ 返回修改評分</button>
         </div>
 
         <div class="footer-credit">2026.08 社大版 徐瑞玲老師編表</div>
@@ -435,7 +435,7 @@
             '-1': '清淡',
             '0': '',
             '1': '滿意',
-            '2': '特出'
+            '2': '特殊' // 修正：特出改為特殊
         };
 
         const ratingSections = [
@@ -449,7 +449,6 @@
             { key: 'cleanCup', title: '乾淨度/缺點', sub: 'Clean Cup / Defect', index: 6 }
         ];
 
-        // 取得當前格式化日期時間 (用於畫面顯示: YYYY/MM/DD HH:mm)
         function getFormattedDateTime() {
             const now = new Date();
             const year = now.getFullYear();
@@ -460,7 +459,6 @@
             return `${year}/${month}/${day} ${hours}:${minutes}`;
         }
 
-        // 取得當前格式化日期時間 (用於檔名: YYYYMMDD_HHMM)
         function getFileTimestamp() {
             const now = new Date();
             const year = now.getFullYear();
@@ -594,9 +592,16 @@
             }));
 
             renderCards();
+
+            // 1. 預設游標聚焦在姓名欄位
+            setTimeout(() => {
+                const nameInput = document.getElementById('student-name');
+                if (nameInput) nameInput.focus();
+            }, 100);
         }
 
-        function setScore(itemId, sectionKey, scoreVal, scoreIndex) {
+        // 3. 點按評分時局部更新分數與按鈕樣式，不重新 renderCards() 以避開畫面跳躍 bug
+        function setScore(itemId, sectionKey, scoreVal, scoreIndex, btnElement) {
             const item = items.find(i => i.id === itemId);
             if (!item) return;
 
@@ -606,7 +611,17 @@
                 item.scores[scoreIndex] = scoreVal;
             }
 
-            renderCards();
+            // 更新總分顯示
+            const card = btnElement.closest('.item-card');
+            const itemTotal = 80 + item.scores.reduce((a, b) => a + b, 0);
+            card.querySelector('.item-card-score span').innerText = itemTotal;
+
+            // 更新該區域按鈕 active 狀態
+            const ratingGroup = btnElement.closest('.rating-group');
+            ratingGroup.querySelectorAll('.score-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            btnElement.classList.add('active');
         }
 
         function updateTextField(itemId, field, value) {
@@ -636,9 +651,9 @@
 
                         return `
                             <div class="score-btn-wrap">
-                                <div class="score-btn ${activeClass}" onclick="setScore(${item.id}, '${sec.key}', ${opt}, ${sec.index ?? 'null'})">
+                                <button type="button" class="score-btn ${activeClass}" onclick="setScore(${item.id}, '${sec.key}', ${opt}, ${sec.index ?? 'null'}, this)">
                                     ${displayVal}
-                                </div>
+                                </button>
                                 <div class="score-label">${labelText}</div>
                             </div>
                         `;
@@ -672,7 +687,8 @@
                         </div>
                         <div class="form-group">
                             <label>烘焙度</label>
-                            <input type="text" value="${item.roast}" placeholder="例如: 78" oninput="updateTextField(${item.id}, 'roast', this.value)">
+                            <!-- 2. 烘焙度只能輸入數字與小數點 -->
+                            <input type="number" step="any" value="${item.roast}" placeholder="例如: 78.5" oninput="updateTextField(${item.id}, 'roast', this.value)">
                         </div>
                     </div>
 
@@ -760,7 +776,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // 下載結果頁為 JPG 圖檔
         function downloadResultJPG() {
             const exportElement = document.getElementById('export-area');
             const tableWrap = document.getElementById('table-wrap');

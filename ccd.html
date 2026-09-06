@@ -295,6 +295,15 @@
             color: #d9534f !important;
         }
 
+        /* 頁尾資訊樣式 */
+        .footer-credit {
+            text-align: right;
+            font-size: 13px;
+            color: #666;
+            margin-top: 15px;
+            padding-top: 10px;
+        }
+
         .hidden {
             display: none !important;
         }
@@ -331,6 +340,8 @@
             <div id="qrcode"></div>
             <button class="btn btn-add" onclick="goToStudentPage()">直接進入評分頁面</button>
         </div>
+
+        <div class="footer-credit">2026.08 社大版 徐瑞玲老師編表</div>
     </div>
 
     <!-- 步驟 2：學生評分頁面 -->
@@ -358,11 +369,13 @@
         <div style="margin-top: 20px;">
             <button class="btn btn-print" onclick="showHtmlResult()">📱 顯示結果</button>
         </div>
+
+        <div class="footer-credit">2026.08 社大版 徐瑞玲老師編表</div>
     </div>
 
     <!-- 步驟 3：HTML 評分結果畫面 (可直接下載/產圖) -->
     <div id="result-section" class="card hidden">
-        <!-- 欲導出圖檔的內容區域 -->
+        <!-- 欲導出圖檔的內容區域 (已移除內部的標註文字) -->
         <div id="export-area" style="padding: 10px; background: #ffffff;">
             <div class="header-info-container">
                 <!-- 第一列：主題 -->
@@ -410,6 +423,8 @@
             <button class="btn btn-jpg" onclick="downloadResultJPG()">🖼️ 下載 JPG 圖片</button>
             <button class="btn btn-secondary" onclick="backToRating()">✏️ 返回修改評分</button>
         </div>
+
+        <div class="footer-credit">2026.08 社大版 徐瑞玲老師編表</div>
     </div>
 
     <script>
@@ -745,13 +760,13 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // 下載結果頁為 JPG 圖檔 (檔名加上 _YYYYMMDD_HHMM 時間戳記)
+        // 下載結果頁為 JPG 圖檔
         function downloadResultJPG() {
             const exportElement = document.getElementById('export-area');
             const tableWrap = document.getElementById('table-wrap');
             const table = document.getElementById('result-table');
             const studentName = document.getElementById('result-display-name').innerText || '杯測結果';
-            const timestamp = getFileTimestamp(); // 取得日期時間字串
+            const timestamp = getFileTimestamp();
 
             const origOverflow = tableWrap.style.overflow;
             const origWidth = exportElement.style.width;
@@ -802,7 +817,6 @@
                     }
                 } else {
                     const link = document.createElement('a');
-                    // 檔名加上 _日期時間 作為檔案辨識
                     link.download = `CCD杯測表_${studentName}_${timestamp}.jpg`;
                     link.href = imageData;
                     link.click();

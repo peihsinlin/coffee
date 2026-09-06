@@ -471,7 +471,8 @@
 
         function generateItemInputs() {
             const container = document.getElementById('item-titles-container');
-            const count = parseInt(document.getElementById('item-count-input').value, 10);
+            const countInput = document.getElementById('item-count-input');
+            const count = parseInt(countInput.value, 10);
             
             container.innerHTML = '';
             if (isNaN(count) || count <= 0) return;
@@ -496,7 +497,7 @@
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.className = 'item-title-setting';
-                input.value = '';
+                input.placeholder = `例如：樣品 ${i}`;
 
                 rowDiv.appendChild(label);
                 rowDiv.appendChild(input);
@@ -521,35 +522,45 @@
         };
 
         function startCupTasting() {
-            const topic = document.getElementById('topic-input').value.trim();
-            const count = parseInt(document.getElementById('item-count-input').value, 10);
+            const topicInput = document.getElementById('topic-input');
+            const topic = topicInput.value.trim();
+            const countInput = document.getElementById('item-count-input');
+            const count = parseInt(countInput.value, 10);
 
+            // 1. 檢查杯測主題
             if (!topic) {
-                alert('請輸入杯測主題！');
+                alert('請輸入「杯測主題」！');
+                topicInput.focus();
                 return;
             }
+
+            // 2. 檢查品項數量
             if (isNaN(count) || count <= 0) {
-                alert('請輸入有效的品項數量！');
+                alert('請輸入有效的「品項數量」！');
+                countInput.focus();
                 return;
             }
 
+            // 3. 檢查品項名稱設定
             const titleInputs = document.querySelectorAll('.item-title-setting');
-            const itemTitles = [];
-            let hasEmpty = false;
+            if (titleInputs.length === 0) {
+                alert('請輸入「品項數量」以產生品項名稱填寫欄位！');
+                countInput.focus();
+                return;
+            }
 
-            titleInputs.forEach((input) => {
-                const val = input.value.trim();
+            const itemTitles = [];
+            for (let i = 0; i < titleInputs.length; i++) {
+                const val = titleInputs[i].value.trim();
                 if (!val) {
-                    hasEmpty = true;
+                    alert(`請填寫「品項 ${i + 1}」的名稱！`);
+                    titleInputs[i].focus();
+                    return;
                 }
                 itemTitles.push(val);
-            });
-
-            if (hasEmpty || itemTitles.length === 0) {
-                alert('請填寫所有品項名稱！');
-                return;
             }
 
+            // 全部驗證通過，產生 QR Code
             const currentUrl = window.location.href.split('?')[0];
             const targetUrl = `${currentUrl}?topic=${encodeURIComponent(topic)}&items=${encodeURIComponent(JSON.stringify(itemTitles))}`;
 

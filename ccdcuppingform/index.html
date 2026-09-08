@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>杯測評分表｜第五波 精品咖啡 80以上+++</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+
+<div class="shell">
+
+  <!-- ============ VIEW 1 : 老師設定主題 ============ -->
+  <div class="view" id="view-teacher">
+    <div class="brand">
+      <p class="kicker">C.C.D. 杯測表手機版 · 第五波 精品咖啡 80以上+++</p>
+      <h1>杯測評分表</h1>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label for="in-topic">本次主題</label>
+        <input type="text" id="in-topic" placeholder="例如：2026 cup">
+      </div>
+      <div class="field">
+        <label for="in-count">品項數量</label>
+        <div class="stepper-row">
+          <button type="button" class="stepper-btn" id="count-minus" aria-label="減少">－</button>
+          <input type="text" id="in-count" inputmode="numeric" pattern="[0-9]*" value="1">
+          <button type="button" class="stepper-btn" id="count-plus" aria-label="增加">＋</button>
+        </div>
+        <p class="hint">用左右按鈕調整杯測的樣品數量（1～12），下方會自動產生對應數量的品項名稱欄位，可自行修改每個品項的名稱。</p>
+      </div>
+      <div id="teacher-items-container"></div>
+      <button class="btn btn-primary" onclick="createSession()">產生評分 QR Code →</button>
+    </div>
+  </div>
+
+  <!-- ============ VIEW 2 : QR 頁 ============ -->
+  <div class="view" id="view-qr">
+    <div class="brand">
+      <p class="kicker">請將手機交給投影，或分享此畫面</p>
+      <h1>掃碼開始評分</h1>
+    </div>
+    <div class="card">
+      <p class="topic-display" id="qr-topic-text"></p>
+      <div class="qr-wrap"><div id="qrcode"></div></div>
+      <p class="center-caption">請用手機掃描上方 QR Code，即可進入本次評分頁面</p>
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-outline" style="background:var(--parchment);" onclick="copyScoreLink()" id="copy-link-btn">複製連結</button>
+        <button class="btn btn-outline" style="background:var(--parchment);" onclick="goToScoreDirect()">直接進入評分頁 →</button>
+      </div>
+      <button class="back-link back-link-on-card" onclick="goView('view-teacher')">← 修改主題／品項</button>
+    </div>
+  </div>
+
+
+  <!-- ============ VIEW 3 : 學生評分 ============ -->
+  <div class="view" id="view-score">
+    <div class="brand">
+      <p class="kicker">C.C.D. 杯測表手機版 · 第五波 精品咖啡 80以上+++</p>
+      <h1>杯測評分表</h1>
+      <h1 class="topic-line" id="score-topic-echo">—</h1>
+    </div>
+
+    <div class="card">
+      <div class="field" id="field-name">
+        <label for="in-name">姓名 / 暱稱</label>
+        <input type="text" id="in-name" placeholder="">
+        <p class="err">請輸入姓名或暱稱</p>
+      </div>
+
+      <div id="items-container"></div>
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:14px;" onclick="submitScore()">完成評分，產生結果表 →</button>
+  </div>
+
+  <!-- ============ VIEW 4 : 結果（橫式總表） ============ -->
+  <div class="view" id="view-result">
+    <div class="brand" style="margin-bottom:14px;">
+      <p class="kicker">C.C.D. 杯測表手機版 · 第五波 精品咖啡 80以上+++</p>
+      <h1>杯測評分表 結果總表</h1>
+    </div>
+
+    <div class="result-stage">
+      <div id="resultCard">
+        <div class="rc-title-row">
+          <h2 id="rc-topic">主題</h2>
+          <div class="rc-meta-line">
+            <span>姓名：<b id="rc-name">—</b></span>
+            <span id="rc-date">—</span>
+            <span class="rc-brand-tag">C.C.D. 杯測表手機版　2026.08 社大版 徐瑞玲老師編表</span>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table id="rc-table">
+            <thead>
+              <tr>
+                <th>品項</th>
+                <th>名次</th>
+                <th>烘焙度</th>
+                <th>風/滋味描述</th>
+                <th>乾/濕香<span class="th-sub">不計分</span></th>
+                <th>風/滋味</th>
+                <th>酸質</th>
+                <th>口感</th>
+                <th>甜度</th>
+                <th>餘韻</th>
+                <th>平衡性</th>
+                <th>乾淨度/缺點</th>
+                <th>總分</th>
+                <th>備註</th>
+              </tr>
+            </thead>
+            <tbody id="rc-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-actions">
+      <div class="actions-row">
+        <button class="btn btn-outline" style="background:var(--parchment);" onclick="window.print()">🖨 列印</button>
+        <button class="btn btn-primary" onclick="saveAsImage()">⬇ 另存圖片</button>
+      </div>
+      <button class="back-link" onclick="goView('view-score')">← 返回修改評分</button>
+    </div>
+  </div>
+
+  <p class="page-footer">2026.08 社大版 徐瑞玲老師編表</p>
+
+</div>
+
+<script src="vendor.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

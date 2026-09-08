@@ -51,7 +51,7 @@
       <p class="center-caption">請用手機掃描上方 QR Code，即可進入本次評分頁面</p>
       <div class="btn-row" style="margin-top:14px;">
         <button class="btn btn-outline" style="background:var(--parchment);" onclick="copyScoreLink()" id="copy-link-btn">複製連結</button>
-        <button class="btn btn-outline" style="background:var(--parchment);" onclick="goToScoreDirect()">直接進入評分頁 →</button>
+        <button class="btn btn-outline" style="background:var(--parchment);" onclick="goToScoreDirect()">進入評分頁 →</button>
       </div>
       <button class="back-link back-link-on-card" onclick="goView('view-teacher')">← 修改主題／品項</button>
     </div>
@@ -93,7 +93,7 @@
           <div class="rc-meta-line">
             <span>姓名：<b id="rc-name">—</b></span>
             <span id="rc-date">—</span>
-            <span class="rc-brand-tag">C.C.D. 杯測表手機版　2026.08 社大版 徐瑞玲老師編表</span>
+            <span class="rc-brand-tag">C.C.D. 杯測表手機版<span class="rc-attribution" id="rc-attribution">　2026.08 社大版 徐瑞玲老師編表</span></span>
           </div>
         </div>
         <div class="table-scroll">
@@ -124,7 +124,7 @@
 
     <div class="result-actions">
       <div class="actions-row">
-        <button class="btn btn-outline" style="background:var(--parchment);" onclick="window.print()">🖨 列印</button>
+        <button class="btn btn-outline" style="background:var(--parchment);" onclick="handlePrint()">🖨 列印</button>
         <button class="btn btn-primary" onclick="saveAsImage()">⬇ 另存圖片</button>
       </div>
       <button class="back-link" onclick="goView('view-score')">← 返回修改評分</button>

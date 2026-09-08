@@ -13,48 +13,55 @@ const state = {
   items:[]
 };
 
-let teacherItemNames = ['品項1'];
+let teacherItems = [{ name:'品項1', roast:'' }];
 
 function makeScores(){
   const s = { aroma:0 };
   CATEGORY_DEFS.forEach(c=>{ s[c.key] = 0; });
   return s;
 }
-function newItemData(name){
-  return { name: (name && name.trim()) ? name.trim() : '品項1', flavorNote:'', agtron:'', notes:'', scores: makeScores() };
+function newItemData(name, roast){
+  return { name: (name && name.trim()) ? name.trim() : '品項1', flavorNote:'', agtron: (roast || ''), notes:'', scores: makeScores() };
 }
 function itemTotal(item){
   return 80 + CATEGORY_DEFS.reduce((sum,c)=>sum+item.scores[c.key],0);
 }
 
 // =====================================================================
-// 老師端：品項數量 → 動態品項名稱欄位
+// 老師端：品項數量 → 動態品項名稱／烘焙度欄位
 // =====================================================================
 function applyItemCount(n){
   if(isNaN(n) || n < 1) n = 1;
   if(n > 12) n = 12;
   document.getElementById('in-count').value = n;
-  while(teacherItemNames.length < n) teacherItemNames.push('品項' + (teacherItemNames.length + 1));
-  while(teacherItemNames.length > n) teacherItemNames.pop();
+  while(teacherItems.length < n) teacherItems.push({ name:'品項' + (teacherItems.length + 1), roast:'' });
+  while(teacherItems.length > n) teacherItems.pop();
   renderTeacherItemFields();
 }
 
 function stepItemCount(delta){
   const current = parseInt(document.getElementById('in-count').value, 10);
-  applyItemCount((isNaN(current) ? teacherItemNames.length : current) + delta);
+  applyItemCount((isNaN(current) ? teacherItems.length : current) + delta);
 }
 
 function renderTeacherItemFields(){
   const container = document.getElementById('teacher-items-container');
   container.innerHTML = '';
-  teacherItemNames.forEach((name, i)=>{
+  teacherItems.forEach((item, i)=>{
     const field = document.createElement('div');
-    field.className = 'field';
+    field.className = 'two-col-row';
     field.innerHTML = `
-      <label>品項${i+1} 名稱</label>
-      <input type="text" class="teacher-item-name" value="${name}" placeholder="例如：品項${i+1}">
+      <div class="field">
+        <label>品項${i+1} 名稱</label>
+        <input type="text" class="teacher-item-name" value="${item.name}" placeholder="例如：品項${i+1}">
+      </div>
+      <div class="field">
+        <label>烘焙度<em>（選填）</em></label>
+        <input type="text" inputmode="numeric" class="teacher-item-roast" value="${item.roast}" placeholder="選填">
+      </div>
     `;
-    field.querySelector('input').addEventListener('input', e=>{ teacherItemNames[i] = e.target.value; });
+    field.querySelector('.teacher-item-name').addEventListener('input', e=>{ item.name = e.target.value; });
+    field.querySelector('.teacher-item-roast').addEventListener('input', e=>{ item.roast = e.target.value; });
     container.appendChild(field);
   });
 }
@@ -161,16 +168,19 @@ function createSession(){
     document.getElementById('in-topic').focus();
     return;
   }
-  const names = teacherItemNames.map((n,i)=> (n && n.trim()) ? n.trim() : ('品項' + (i+1)));
+  const items = teacherItems.map((it,i)=> ({
+    n: (it.name && it.name.trim()) ? it.name.trim() : ('品項' + (i+1)),
+    r: (it.roast || '').trim()
+  }));
 
   state.topic = topic;
-  state.items = names.map(name => newItemData(name));
+  state.items = items.map(it => newItemData(it.n, it.r));
 
   document.getElementById('qr-topic-text').textContent = topic;
 
   const url = new URL(window.location.href.split('?')[0]);
   url.searchParams.set('topic', topic);
-  url.searchParams.set('items', JSON.stringify(names));
+  url.searchParams.set('items', JSON.stringify(items));
   url.searchParams.set('view', 'score');
   currentSessionUrl = url.toString();
 
@@ -308,24 +318,57 @@ function isAppleTouchDevice(){
   return isIPhoneIPod || isIPad;
 }
 
+// LINE / Messenger / Instagram / WeChat / Twitter in-app "mini browsers" —
+// these often block <a download> and don't implement window.print() at all.
+function isInAppBrowser(){
+  const ua = navigator.userAgent || '';
+  return /Line\//i.test(ua) || /FBAN|FBAV|FB_IAB|FBIOS/i.test(ua) ||
+         /Messenger/i.test(ua) || /Instagram/i.test(ua) ||
+         /MicroMessenger/i.test(ua) || /Twitter/i.test(ua);
+}
+function isAndroidDevice(){
+  return /Android/i.test(navigator.userAgent || '');
+}
+
+// 列印按鈕：in-app 瀏覽器通常沒有列印功能，改為引導使用者改用一般瀏覽器開啟
+function handlePrint(){
+  if(!isInAppBrowser()){
+    window.print();
+    return;
+  }
+  if(isAndroidDevice()){
+    const proceed = confirm('目前在 LINE／Messenger 等 App 內建瀏覽器中，列印功能可能無法使用。\n\n按下「確定」將嘗試用手機瀏覽器（Chrome）開啟此頁面。');
+    if(proceed){
+      const noProto = window.location.href.replace(/^https?:\/\//,'');
+      window.location.href = 'intent://' + noProto + '#Intent;scheme=https;package=com.android.chrome;end';
+    }
+  } else {
+    alert('目前在 App 內建瀏覽器中，列印功能可能無法使用。\n請點畫面右上角的「⋯」或分享選單，選擇「在瀏覽器中開啟」，再使用列印功能。');
+  }
+}
+
 async function saveAsImage(){
   const card = document.getElementById('resultCard');
   const scrollWrap = card.querySelector('.table-scroll');
   const table = document.getElementById('rc-table');
+  const attribution = document.getElementById('rc-attribution');
 
   // temporarily expand the card to the table's full natural width so the
-  // capture isn't clipped by the on-screen horizontal-scroll viewport
+  // capture isn't clipped by the on-screen horizontal-scroll viewport, and
+  // reveal the attribution line (hidden on-screen, shown in exported output)
   const prevWidth = card.style.width;
   const prevMaxWidth = card.style.maxWidth;
   scrollWrap.classList.add('capture-mode');
   const fullWidth = table.scrollWidth + 34; // + card's left/right padding
   card.style.maxWidth = 'none';
   card.style.width = fullWidth + 'px';
+  if(attribution) attribution.style.display = 'inline';
 
   const restore = () => {
     card.style.width = prevWidth;
     card.style.maxWidth = prevMaxWidth;
     scrollWrap.classList.remove('capture-mode');
+    if(attribution) attribution.style.display = '';
   };
 
   let canvas;
@@ -359,7 +402,17 @@ async function saveAsImage(){
       return;
     }
 
-    // all other platforms (Android, Windows, Mac, Linux...): direct file download
+    // Android in-app "mini browsers" (LINE, Messenger, Instagram...) often
+    // silently block <a download>. Navigate to the image directly instead —
+    // the user can then long-press it and choose "Save image".
+    if(isInAppBrowser()){
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      alert('圖片將在新畫面開啟，請長按圖片選擇「儲存圖片」即可存到相簿。');
+      window.location.href = dataUrl;
+      return;
+    }
+
+    // all other platforms (regular Android/desktop browsers): direct file download
     const link = document.createElement('a');
     link.download = filename;
     link.href = URL.createObjectURL(blob);
@@ -397,14 +450,19 @@ window.addEventListener('beforeunload', function(e){
 
   if(topic){
     state.topic = topic;
-    let names = ['品項1'];
+    let items = [{ n:'品項1', r:'' }];
     if(itemsParam){
       try {
         const parsed = JSON.parse(itemsParam);
-        if(Array.isArray(parsed) && parsed.length) names = parsed;
+        if(Array.isArray(parsed) && parsed.length){
+          // support both the current {n, r} format and older plain-string links
+          items = parsed.map((it, i) => (typeof it === 'string')
+            ? { n: it, r:'' }
+            : { n: it.n || ('品項' + (i+1)), r: it.r || '' });
+        }
       } catch(e){ /* fall back to default */ }
     }
-    state.items = names.map(name => newItemData(name));
+    state.items = items.map(it => newItemData(it.n, it.r));
     document.getElementById('score-topic-echo').textContent = topic;
     renderAllItems();
     goView('view-score');

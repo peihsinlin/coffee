@@ -86,6 +86,7 @@
     font-weight:700;
     color:var(--ink);
   }
+  label em{font-style:normal;color:var(--ink-soft);font-weight:400;}
   label.field-label-strong em{font-style:normal;color:var(--ink-soft);font-weight:400;font-size:12.5px;margin-left:4px;}
   input[type="text"], input[type="number"], textarea{
     width:100%;
@@ -269,6 +270,7 @@
   }
   .rc-meta-line b{color:var(--ink);}
   .rc-brand-tag{margin-left:auto;font-weight:700;color:var(--roast);}
+  .rc-attribution{ display:none; }
 
   .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .table-scroll.capture-mode{overflow:visible;}
@@ -329,5 +331,6 @@
       box-shadow:none; border:1px solid var(--line);
     }
     .table-scroll{overflow:visible;}
+    .rc-attribution{ display:inline; }
     @page{ size:landscape; margin:8mm; }
   }

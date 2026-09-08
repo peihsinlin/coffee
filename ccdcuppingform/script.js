@@ -330,6 +330,17 @@ function isAndroidDevice(){
   return /Android/i.test(navigator.userAgent || '');
 }
 
+// In-page fallback viewer for browsers that block downloads/navigation to
+// data: URLs (common in LINE/Messenger's in-app WebView on Android).
+function showImagePreview(dataUrl){
+  document.getElementById('image-preview-img').src = dataUrl;
+  document.getElementById('image-preview-overlay').style.display = 'flex';
+}
+function closeImagePreview(){
+  document.getElementById('image-preview-overlay').style.display = 'none';
+  document.getElementById('image-preview-img').src = '';
+}
+
 // 列印按鈕：in-app 瀏覽器通常沒有列印功能，改為引導使用者改用一般瀏覽器開啟
 function handlePrint(){
   if(!isInAppBrowser()){
@@ -403,12 +414,11 @@ async function saveAsImage(){
     }
 
     // Android in-app "mini browsers" (LINE, Messenger, Instagram...) often
-    // silently block <a download>. Navigate to the image directly instead —
-    // the user can then long-press it and choose "Save image".
+    // silently block <a download> AND navigating to a data:/blob: URL. Show
+    // the image inline instead — the user can long-press it to save, which
+    // works even in heavily restricted WebViews since it's plain DOM/img.
     if(isInAppBrowser()){
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-      alert('圖片將在新畫面開啟，請長按圖片選擇「儲存圖片」即可存到相簿。');
-      window.location.href = dataUrl;
+      showImagePreview(canvas.toDataURL('image/jpeg', 0.92));
       return;
     }
 

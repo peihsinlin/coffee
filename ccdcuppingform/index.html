@@ -135,6 +135,17 @@
 
 </div>
 
+<!-- fallback for in-app browsers (LINE/Messenger...) where downloads and
+     data: URL navigation are often blocked — shows the image in-page so the
+     user can long-press it and choose "Save image" -->
+<div id="image-preview-overlay" class="image-preview-overlay" style="display:none;">
+  <div class="image-preview-inner">
+    <p class="image-preview-hint">長按圖片，選擇「儲存圖片」即可存到相簿</p>
+    <img id="image-preview-img" src="" alt="杯測評分結果">
+    <button type="button" class="btn btn-primary" onclick="closeImagePreview()">關閉</button>
+  </div>
+</div>
+
 <script src="vendor.js"></script>
 <script src="script.js"></script>
 </body>

@@ -332,10 +332,10 @@ function isAndroidDevice(){
   return /Android/i.test(navigator.userAgent || '');
 }
 
-// Full-screen blocking modal shown on load when an in-app browser is
-// detected on Android (iOS in-app browsers don't have this print/download
-// limitation, so they're left alone). No dismiss button — the user needs to
-// actually switch to a real browser via the "⋯" menu to use the app fully.
+// Full-screen blocking modal shown on load when an in-app browser (LINE,
+// Messenger, etc.) is detected, on any platform — the user needs to switch
+// to a real browser via the "⋯" menu to use print/save-image fully. No
+// dismiss button by design.
 function showInAppBrowserNotice(){
   const el = document.getElementById('inapp-browser-notice');
   if(el) el.style.display = 'flex';
@@ -448,7 +448,7 @@ window.addEventListener('beforeunload', function(e){
 (function init(){
   renderTeacherItemFields();
 
-  if(isInAppBrowser() && !isAppleTouchDevice()) showInAppBrowserNotice();
+  if(isInAppBrowser()) showInAppBrowserNotice();
 
   const params = new URLSearchParams(window.location.search);
   const topic = params.get('topic');

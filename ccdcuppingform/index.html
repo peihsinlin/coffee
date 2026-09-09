@@ -12,16 +12,15 @@
 <body>
 
 
-<div class="shell">
-
-  <div id="inapp-browser-notice" class="inapp-notice" style="display:none;">
+<div id="inapp-browser-notice" class="inapp-notice-overlay" style="display:none;">
+  <div class="inapp-notice-modal">
     <span class="inapp-notice-icon">⋮</span>
-    <div class="inapp-notice-text">
-      <p><b>建議用瀏覽器開啟</b></p>
-      <p>請點右上角「⋮／⋯」選單，選擇「用瀏覽器開啟」，才能完整使用列印與另存圖片功能。</p>
-    </div>
-    <button type="button" class="inapp-notice-close" onclick="dismissInAppBrowserNotice()" aria-label="關閉">✕</button>
+    <h2 class="inapp-notice-title">建議用瀏覽器開啟</h2>
+    <p class="inapp-notice-text">請點右上（或左下）角「⋮／⋯」選單，選擇「用（預設）瀏覽器開啟」，才能完整使用列印與另存圖片功能。</p>
   </div>
+</div>
+
+<div class="shell">
 
   <!-- ============ VIEW 1 : 老師設定主題 ============ -->
   <div class="view" id="view-teacher">

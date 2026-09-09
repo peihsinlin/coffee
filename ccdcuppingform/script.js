@@ -332,16 +332,14 @@ function isAndroidDevice(){
   return /Android/i.test(navigator.userAgent || '');
 }
 
-// Proactive banner shown once on load when an in-app browser is detected,
-// pointing the user at the "⋯" menu so they open the page in a real browser
-// before running into print/download limitations.
-function showInAppBrowserBanner(){
+// Full-screen blocking modal shown on load when an in-app browser is
+// detected on Android (iOS in-app browsers don't have this print/download
+// limitation, so they're left alone). No dismiss button — the user needs to
+// actually switch to a real browser via the "⋯" menu to use the app fully.
+function showInAppBrowserNotice(){
   const el = document.getElementById('inapp-browser-notice');
   if(el) el.style.display = 'flex';
-}
-function dismissInAppBrowserNotice(){
-  const el = document.getElementById('inapp-browser-notice');
-  if(el) el.style.display = 'none';
+  document.body.style.overflow = 'hidden';
 }
 
 // 列印按鈕：in-app 瀏覽器通常沒有列印功能，改為引導使用者改用一般瀏覽器開啟
@@ -450,7 +448,7 @@ window.addEventListener('beforeunload', function(e){
 (function init(){
   renderTeacherItemFields();
 
-  if(isInAppBrowser()) showInAppBrowserBanner();
+  if(isInAppBrowser() && !isAppleTouchDevice()) showInAppBrowserNotice();
 
   const params = new URLSearchParams(window.location.search);
   const topic = params.get('topic');

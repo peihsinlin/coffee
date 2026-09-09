@@ -331,14 +331,24 @@ function isAndroidDevice(){
 }
 
 // In-page fallback viewer for browsers that block downloads/navigation to
-// data: URLs (common in LINE/Messenger's in-app WebView on Android).
-function showImagePreview(dataUrl){
-  document.getElementById('image-preview-img').src = dataUrl;
+// data: URLs (common in LINE/Messenger's in-app WebView on Android). Uses a
+// blob: URL rather than a data: URI — Android's native long-press "Save
+// image" menu generally only works on a real fetchable resource, and blob:
+// URLs qualify while base64 data: URIs often silently don't.
+let currentPreviewBlobUrl = null;
+function showImagePreview(blob){
+  if(currentPreviewBlobUrl) URL.revokeObjectURL(currentPreviewBlobUrl);
+  currentPreviewBlobUrl = URL.createObjectURL(blob);
+  document.getElementById('image-preview-img').src = currentPreviewBlobUrl;
   document.getElementById('image-preview-overlay').style.display = 'flex';
 }
 function closeImagePreview(){
   document.getElementById('image-preview-overlay').style.display = 'none';
   document.getElementById('image-preview-img').src = '';
+  if(currentPreviewBlobUrl){
+    URL.revokeObjectURL(currentPreviewBlobUrl);
+    currentPreviewBlobUrl = null;
+  }
 }
 
 // 列印按鈕：in-app 瀏覽器通常沒有列印功能，改為引導使用者改用一般瀏覽器開啟
@@ -414,11 +424,22 @@ async function saveAsImage(){
     }
 
     // Android in-app "mini browsers" (LINE, Messenger, Instagram...) often
-    // silently block <a download> AND navigating to a data:/blob: URL. Show
-    // the image inline instead — the user can long-press it to save, which
-    // works even in heavily restricted WebViews since it's plain DOM/img.
+    // block <a download>, block data:/blob: navigation, AND disable the
+    // native long-press "save image" menu on <img> — that last one is a
+    // restriction set by the host app itself, not something a web page can
+    // turn back on. So try the native share sheet first (a different OS
+    // mechanism entirely, unaffected by the long-press restriction); only
+    // fall back to the in-page image preview if sharing isn't available.
     if(isInAppBrowser()){
-      showImagePreview(canvas.toDataURL('image/jpeg', 0.92));
+      if(navigator.canShare && navigator.canShare({ files:[file] })){
+        try {
+          await navigator.share({ files:[file], title: filename });
+          return;
+        } catch(shareErr){
+          // user cancelled, or share failed — fall through to image preview
+        }
+      }
+      showImagePreview(blob);
       return;
     }
 

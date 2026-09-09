@@ -284,7 +284,7 @@
   #rc-table th{background:var(--parchment-deep);font-weight:700;font-size:10.5px;line-height:1.35;}
   #rc-table th .th-sub{display:block;font-weight:500;font-size:9px;color:var(--ink-soft);}
   #rc-table td.item-name{font-weight:700;text-align:left;font-family:var(--serif);}
-  #rc-table td.flavor-note{text-align:left;white-space:normal;max-width:150px;color:var(--ink-soft);}
+  #rc-table td.flavor-note{text-align:left;white-space:nowrap;color:var(--ink-soft);}
   #rc-table td.rank{font-weight:700;}
   #rc-table td.num.pos{color:var(--moss);font-weight:700;}
   #rc-table td.num.neg{color:var(--clay);font-weight:700;}
@@ -350,6 +350,12 @@
     max-height:65vh;
     border-radius:6px;
     box-shadow:0 12px 30px rgba(0,0,0,0.5);
+    -webkit-touch-callout:default;
+    -webkit-user-select:auto;
+    user-select:auto;
+    -webkit-user-drag:auto;
+    pointer-events:auto;
+    touch-action:auto;
   }
   .image-preview-overlay .btn{
     margin-top:18px;

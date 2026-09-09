@@ -319,7 +319,9 @@ function isAppleTouchDevice(){
 }
 
 // LINE / Messenger / Instagram / WeChat / Twitter in-app "mini browsers" —
-// these often block <a download> and don't implement window.print() at all.
+// these often block window.print() and behave inconsistently with file
+// downloads / long-press "save image" — best fixed by asking the user to
+// open the page in a real browser rather than working around each quirk.
 function isInAppBrowser(){
   const ua = navigator.userAgent || '';
   return /Line\//i.test(ua) || /FBAN|FBAV|FB_IAB|FBIOS/i.test(ua) ||
@@ -330,25 +332,16 @@ function isAndroidDevice(){
   return /Android/i.test(navigator.userAgent || '');
 }
 
-// In-page fallback viewer for browsers that block downloads/navigation to
-// data: URLs (common in LINE/Messenger's in-app WebView on Android). Uses a
-// blob: URL rather than a data: URI — Android's native long-press "Save
-// image" menu generally only works on a real fetchable resource, and blob:
-// URLs qualify while base64 data: URIs often silently don't.
-let currentPreviewBlobUrl = null;
-function showImagePreview(blob){
-  if(currentPreviewBlobUrl) URL.revokeObjectURL(currentPreviewBlobUrl);
-  currentPreviewBlobUrl = URL.createObjectURL(blob);
-  document.getElementById('image-preview-img').src = currentPreviewBlobUrl;
-  document.getElementById('image-preview-overlay').style.display = 'flex';
+// Proactive banner shown once on load when an in-app browser is detected,
+// pointing the user at the "⋯" menu so they open the page in a real browser
+// before running into print/download limitations.
+function showInAppBrowserBanner(){
+  const el = document.getElementById('inapp-browser-notice');
+  if(el) el.style.display = 'flex';
 }
-function closeImagePreview(){
-  document.getElementById('image-preview-overlay').style.display = 'none';
-  document.getElementById('image-preview-img').src = '';
-  if(currentPreviewBlobUrl){
-    URL.revokeObjectURL(currentPreviewBlobUrl);
-    currentPreviewBlobUrl = null;
-  }
+function dismissInAppBrowserNotice(){
+  const el = document.getElementById('inapp-browser-notice');
+  if(el) el.style.display = 'none';
 }
 
 // 列印按鈕：in-app 瀏覽器通常沒有列印功能，改為引導使用者改用一般瀏覽器開啟
@@ -423,27 +416,9 @@ async function saveAsImage(){
       return;
     }
 
-    // Android in-app "mini browsers" (LINE, Messenger, Instagram...) often
-    // block <a download>, block data:/blob: navigation, AND disable the
-    // native long-press "save image" menu on <img> — that last one is a
-    // restriction set by the host app itself, not something a web page can
-    // turn back on. So try the native share sheet first (a different OS
-    // mechanism entirely, unaffected by the long-press restriction); only
-    // fall back to the in-page image preview if sharing isn't available.
-    if(isInAppBrowser()){
-      if(navigator.canShare && navigator.canShare({ files:[file] })){
-        try {
-          await navigator.share({ files:[file], title: filename });
-          return;
-        } catch(shareErr){
-          // user cancelled, or share failed — fall through to image preview
-        }
-      }
-      showImagePreview(blob);
-      return;
-    }
-
-    // all other platforms (regular Android/desktop browsers): direct file download
+    // everyone else (Android, desktop...): direct file download. In-app
+    // browsers are handled upfront by the banner asking users to switch to
+    // a real browser, so this stays simple rather than adding extra steps.
     const link = document.createElement('a');
     link.download = filename;
     link.href = URL.createObjectURL(blob);
@@ -474,6 +449,8 @@ window.addEventListener('beforeunload', function(e){
 
 (function init(){
   renderTeacherItemFields();
+
+  if(isInAppBrowser()) showInAppBrowserBanner();
 
   const params = new URLSearchParams(window.location.search);
   const topic = params.get('topic');

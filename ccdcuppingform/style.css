@@ -284,7 +284,7 @@
   #rc-table th{background:var(--parchment-deep);font-weight:700;font-size:10.5px;line-height:1.35;}
   #rc-table th .th-sub{display:block;font-weight:500;font-size:9px;color:var(--ink-soft);}
   #rc-table td.item-name{font-weight:700;text-align:left;font-family:var(--serif);}
-  #rc-table td.flavor-note{text-align:left;white-space:nowrap;color:var(--ink-soft);}
+  #rc-table td.flavor-note{text-align:left;white-space:normal;word-break:break-word;min-width:100px;max-width:230px;color:var(--ink-soft);}
   #rc-table td.rank{font-weight:700;}
   #rc-table td.num.pos{color:var(--moss);font-weight:700;}
   #rc-table td.num.neg{color:var(--clay);font-weight:700;}
@@ -322,43 +322,38 @@
     margin:28px 0 0;
   }
 
-  .image-preview-overlay{
-    position:fixed;
-    inset:0;
-    background:rgba(15,10,7,0.94);
-    z-index:9999;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    padding:24px 16px;
+  .inapp-notice{
+    display:none;
+    align-items:flex-start;
+    gap:10px;
+    background:var(--copper);
+    color:#fff;
+    padding:12px 14px;
+    border-radius:8px;
+    margin-bottom:18px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.3);
   }
-  .image-preview-inner{
-    max-width:100%;
-    width:100%;
-    max-width:520px;
-    text-align:center;
+  .inapp-notice-icon{
+    font-size:22px;
+    font-weight:900;
+    line-height:1.2;
+    flex-shrink:0;
   }
-  .image-preview-hint{
-    color:var(--parchment);
-    font-size:14px;
-    font-weight:600;
-    margin:0 0 14px;
+  .inapp-notice-text{
+    flex:1;
+    font-size:12.5px;
+    line-height:1.55;
   }
-  #image-preview-img{
-    max-width:100%;
-    max-height:65vh;
-    border-radius:6px;
-    box-shadow:0 12px 30px rgba(0,0,0,0.5);
-    -webkit-touch-callout:default;
-    -webkit-user-select:auto;
-    user-select:auto;
-    -webkit-user-drag:auto;
-    pointer-events:auto;
-    touch-action:auto;
-  }
-  .image-preview-overlay .btn{
-    margin-top:18px;
+  .inapp-notice-text b{ font-size:13.5px; }
+  .inapp-notice-close{
+    background:rgba(255,255,255,0.22);
+    border:none;
+    color:#fff;
+    width:24px;height:24px;
+    border-radius:50%;
+    flex-shrink:0;
+    font-size:13px;
+    line-height:1;
   }
 
   @media print{

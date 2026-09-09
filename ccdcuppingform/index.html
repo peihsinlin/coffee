@@ -14,6 +14,15 @@
 
 <div class="shell">
 
+  <div id="inapp-browser-notice" class="inapp-notice" style="display:none;">
+    <span class="inapp-notice-icon">⋮</span>
+    <div class="inapp-notice-text">
+      <p><b>建議用瀏覽器開啟</b></p>
+      <p>請點右上角「⋮／⋯」選單，選擇「用瀏覽器開啟」，才能完整使用列印與另存圖片功能。</p>
+    </div>
+    <button type="button" class="inapp-notice-close" onclick="dismissInAppBrowserNotice()" aria-label="關閉">✕</button>
+  </div>
+
   <!-- ============ VIEW 1 : 老師設定主題 ============ -->
   <div class="view" id="view-teacher">
     <div class="brand">
@@ -133,17 +142,6 @@
 
   <p class="page-footer">2026.08 社大版 徐瑞玲老師編表</p>
 
-</div>
-
-<!-- fallback for in-app browsers (LINE/Messenger...) where downloads and
-     data: URL navigation are often blocked — shows the image in-page so the
-     user can long-press it and choose "Save image" -->
-<div id="image-preview-overlay" class="image-preview-overlay" style="display:none;">
-  <div class="image-preview-inner">
-    <p class="image-preview-hint">長按圖片選擇「儲存圖片」；若無反應，請直接截圖保留成績</p>
-    <img id="image-preview-img" src="" alt="杯測評分結果">
-    <button type="button" class="btn btn-primary" onclick="closeImagePreview()">關閉</button>
-  </div>
 </div>
 
 <script src="vendor.js"></script>

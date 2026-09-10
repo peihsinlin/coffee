@@ -1,1 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>烘焙控制台</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="appbar">
+    <span class="appbar__title">烘焙控制台</span>
+  </header>
 
+  <main>
+    <!-- 設定頁 -->
+    <section id="screen-setup" class="screen">
+      <div class="panel">
+        <h2 class="panel__title">選擇烘豆機</h2>
+        <select id="machineSelect" class="field-select">
+          <option value="">請選擇烘豆機</option>
+        </select>
+        <button type="button" id="btnAddMachine" class="link-btn">＋ 新增烘豆機</button>
+        <div id="addMachineForm" class="inline-form" hidden>
+          <label>名稱
+            <input type="text" id="newMachineName" placeholder="例如：小富士 1kg">
+          </label>
+          <label>容量（g）
+            <input type="number" id="newMachineCapacity" placeholder="1000">
+          </label>
+          <label>備註
+            <input type="text" id="newMachineNote" placeholder="選填">
+          </label>
+          <div class="form-error" id="machineFormError"></div>
+          <div class="inline-form__actions">
+            <button type="button" id="btnSaveMachine" class="btn btn--primary btn--sm">儲存</button>
+            <button type="button" id="btnCancelMachine" class="btn btn--ghost btn--sm">取消</button>
+          </div>
+        </div>
+        <label style="margin-top:12px">烘豆重量（烘前，g，選填）
+          <input type="number" id="weightBefore" placeholder="例如：300">
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">事件提醒</h2>
+        <p class="panel__hint">點選常用事件會帶入名稱與時間，可再調整後加入。時間是從「進豆」開始計算的分:秒</p>
+        <div class="chip-row" id="eventTemplates">
+          <button type="button" class="chip" data-label="回溫點" data-seconds="90">回溫點 1:30</button>
+          <button type="button" class="chip" data-label="脫水" data-seconds="390">脫水 6:30</button>
+          <button type="button" class="chip" data-label="一爆開始" data-seconds="480">一爆開始 8:00</button>
+          <button type="button" class="chip" data-label="一爆結束" data-seconds="570">一爆結束 9:30</button>
+          <button type="button" class="chip" data-label="二爆開始" data-seconds="660">二爆開始 11:00</button>
+          <button type="button" class="chip" data-label="下豆" data-seconds="720">下豆 12:00</button>
+        </div>
+        <ul id="eventList" class="event-list"></ul>
+        <div class="inline-form">
+          <label>事件名稱
+            <input type="text" id="newEventLabel" placeholder="例如：翻豆">
+          </label>
+          <label>提醒時間（分:秒，從烘豆開始計算）
+            <div class="time-input">
+              <input type="number" id="newEventMin" min="0" placeholder="分">
+              <span>:</span>
+              <input type="number" id="newEventSec" min="0" max="59" placeholder="秒">
+            </div>
+          </label>
+          <div class="form-error" id="eventFormError"></div>
+          <button type="button" id="btnAddEvent" class="btn btn--ghost btn--sm">加入事件</button>
+        </div>
+      </div>
+
+      <div class="setup-footer">
+        <button type="button" id="btnStartRoast" class="btn btn--primary btn--block" disabled>開始烘豆</button>
+      </div>
+    </section>
+
+    <!-- 烘豆進行頁 -->
+    <section id="screen-roast" class="screen" hidden>
+      <div class="roast-meta">
+        <span id="roastMachineName">—</span>
+        <span id="roastDate">—</span>
+      </div>
+
+      <div class="timer-face">
+        <div class="timer-face__value" id="timerDisplay">00:00</div>
+        <div class="timer-face__label">已烘焙時間</div>
+      </div>
+      <p class="ror-readout" id="rorReadout">RoR（升溫速率）－</p>
+
+      <div class="control-row">
+        <button type="button" id="btnPauseResume" class="btn btn--ghost">暫停</button>
+        <button type="button" id="btnManualTemp" class="btn btn--ghost">手動記錄溫度</button>
+      </div>
+
+      <div id="tempPrompt" class="capture-panel" hidden>
+        <div class="capture-panel__label" id="tempPromptLabel">請輸入目前溫度</div>
+        <form id="tempPromptForm" class="capture-panel__form">
+          <input type="number" inputmode="decimal" id="tempPromptInput" placeholder="°C" required>
+          <button type="submit" class="btn btn--primary btn--sm">記錄</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">烘焙曲線</h2>
+        <canvas id="liveCurve" class="curve-canvas"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">記錄</h2>
+        <ul id="liveLog" class="log-list">
+          <li class="log-list__empty">尚無紀錄</li>
+        </ul>
+      </div>
+
+      <div class="roast-footer">
+        <button type="button" id="btnFinishRoast" class="btn btn--primary btn--block">結束烘豆，查看結果</button>
+      </div>
+    </section>
+
+    <!-- 結果頁 -->
+    <section id="screen-result" class="screen" hidden>
+      <div class="result-summary">
+        <h2 id="resultMachineName">—</h2>
+        <p id="resultMeta">—</p>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">烘焙摘要</h2>
+        <dl class="summary-grid" id="summaryGrid">
+          <div><dt>發展時間比 DTR</dt><dd id="summaryDtr">—</dd></div>
+          <div><dt>總升溫</dt><dd id="summaryRise">—</dd></div>
+          <div><dt>失重</dt><dd id="summaryLoss">—</dd></div>
+        </dl>
+        <label>烘豆重量（烘後，g，選填以計算失重）
+          <input type="number" id="weightAfter" placeholder="例如：258">
+        </label>
+      </div>
+
+      <div class="panel">
+        <canvas id="resultCurve" class="curve-canvas curve-canvas--lg"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel__title">事件時間軸</h2>
+        <table class="event-table">
+          <thead><tr><th>時間</th><th>事件</th><th>溫度</th></tr></thead>
+          <tbody id="eventTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="result-footer">
+        <button type="button" id="btnExportJpg" class="btn btn--primary btn--block">匯出成 JPG</button>
+        <button type="button" id="btnNewRoast" class="btn btn--ghost btn--block">開始新的烘焙</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

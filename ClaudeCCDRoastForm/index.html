@@ -4,11 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>烘焙控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="app">
   <header class="appbar">
+    <span class="appbar__eyebrow">手機版 · 烘豆助手</span>
     <span class="appbar__title">烘焙控制台</span>
   </header>
 
@@ -16,57 +20,147 @@
     <!-- 設定頁 -->
     <section id="screen-setup" class="screen">
       <div class="panel">
-        <h2 class="panel__title">選擇烘豆機</h2>
-        <select id="machineSelect" class="field-select">
-          <option value="">請選擇烘豆機</option>
-        </select>
-        <button type="button" id="btnAddMachine" class="link-btn">＋ 新增烘豆機</button>
-        <div id="addMachineForm" class="inline-form" hidden>
-          <label>名稱
-            <input type="text" id="newMachineName" placeholder="例如：小富士 1kg">
+        <div class="panel__head"><h2 class="panel__title">生豆資訊</h2></div>
+        <div class="panel__body">
+        <div class="field-grid">
+          <label>烘焙師姓名 <span class="req">＊必填</span>
+            <input type="text" id="roasterName" placeholder="例如：王小明">
           </label>
-          <label>容量（g）
-            <input type="number" id="newMachineCapacity" placeholder="1000">
+          <label>國家／地區 <span class="req">＊必填</span>
+            <input type="text" id="beanOrigin" placeholder="例如：衣索比亞 耶加雪菲">
           </label>
-          <label>備註
-            <input type="text" id="newMachineNote" placeholder="選填">
+          <label>莊園
+            <input type="text" id="beanFarm" placeholder="選填">
           </label>
-          <div class="form-error" id="machineFormError"></div>
-          <div class="inline-form__actions">
-            <button type="button" id="btnSaveMachine" class="btn btn--primary btn--sm">儲存</button>
-            <button type="button" id="btnCancelMachine" class="btn btn--ghost btn--sm">取消</button>
-          </div>
+          <label>公司
+            <input type="text" id="beanCompany" placeholder="選填">
+          </label>
+          <label>品種
+            <input type="text" id="beanVariety" placeholder="例如：藝伎">
+          </label>
+          <label>處理法
+            <input type="text" id="beanProcess" placeholder="例如：水洗">
+          </label>
+          <label>價格／1kg
+            <input type="number" id="beanPrice" placeholder="選填">
+          </label>
+          <label>瑕疵率（%）
+            <input type="number" id="beanDefectRate" placeholder="選填">
+          </label>
+          <label>含水率（%）
+            <input type="number" id="beanMoisture" placeholder="選填">
+          </label>
+          <label>密度
+            <input type="number" id="beanDensity" placeholder="選填">
+          </label>
+          <label class="field-grid__full">備註
+            <input type="text" id="beanNotes" placeholder="選填">
+          </label>
         </div>
-        <label style="margin-top:12px">烘豆重量（烘前，g，選填）
-          <input type="number" id="weightBefore" placeholder="例如：300">
-        </label>
+        </div>
       </div>
 
       <div class="panel">
-        <h2 class="panel__title">事件提醒</h2>
-        <p class="panel__hint">點選常用事件會帶入名稱與時間，可再調整後加入。時間是從「進豆」開始計算的分:秒</p>
-        <div class="chip-row" id="eventTemplates">
-          <button type="button" class="chip" data-label="回溫點" data-seconds="90">回溫點 1:30</button>
-          <button type="button" class="chip" data-label="脫水" data-seconds="390">脫水 6:30</button>
-          <button type="button" class="chip" data-label="一爆開始" data-seconds="480">一爆開始 8:00</button>
-          <button type="button" class="chip" data-label="一爆結束" data-seconds="570">一爆結束 9:30</button>
-          <button type="button" class="chip" data-label="二爆開始" data-seconds="660">二爆開始 11:00</button>
-          <button type="button" class="chip" data-label="下豆" data-seconds="720">下豆 12:00</button>
+        <div class="panel__head"><h2 class="panel__title">烘豆機</h2></div>
+        <div class="panel__body">
+        <label class="field-grid__full">選擇烘豆機
+          <select id="machineSelect" class="field-select">
+            <option value="">請選擇</option>
+            <option value="Mini500">Mini500</option>
+            <option value="FR800">FR800</option>
+            <option value="FR540">FR540</option>
+          </select>
+        </label>
+        <p class="panel__hint">選擇後會顯示「豆量及環境」與「烘焙計劃」；輸入烘前重量會自動帶入烘焙計劃建議值（目前僅 Mini500 有對照表）</p>
         </div>
-        <ul id="eventList" class="event-list"></ul>
-        <div class="inline-form">
-          <label>事件名稱
-            <input type="text" id="newEventLabel" placeholder="例如：翻豆">
+      </div>
+
+      <div class="panel" id="panel-session" hidden>
+        <div class="panel__head"><h2 class="panel__title">豆量及環境</h2></div>
+        <div class="panel__body">
+        <div class="field-grid field-grid--3">
+          <label class="label--tight">烘前重量（g） <span class="req">＊必填</span>
+            <input type="number" id="weightBefore" placeholder="例如：300">
           </label>
-          <label>提醒時間（分:秒，從烘豆開始計算）
-            <div class="time-input">
-              <input type="number" id="newEventMin" min="0" placeholder="分">
-              <span>:</span>
-              <input type="number" id="newEventSec" min="0" max="59" placeholder="秒">
-            </div>
+          <label>溫度（°C）
+            <input type="number" id="sessionTemp" placeholder="選填">
           </label>
-          <div class="form-error" id="eventFormError"></div>
-          <button type="button" id="btnAddEvent" class="btn btn--ghost btn--sm">加入事件</button>
+          <label>濕度（%）
+            <input type="number" id="sessionHumidity" placeholder="選填">
+          </label>
+        </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-plan" hidden>
+        <div class="panel__head"><h2 class="panel__title">烘焙計劃</h2></div>
+        <div class="panel__body">
+
+        <div id="planFixedFields">
+        <p class="panel__hint">輸入烘前重量後會自動帶入建議數值，也可以手動調整</p>
+        <div class="field-grid field-grid--3">
+          <label>入豆溫度（°C）
+            <input type="number" id="planChargeTemp" placeholder="—">
+          </label>
+          <label>轉速（rpm）
+            <input type="number" id="sessionRpm" placeholder="—">
+          </label>
+          <label>初始風門
+            <input type="text" id="planDamper000" placeholder="—">
+          </label>
+          <label>回溫點火力
+            <input type="number" id="planPower000" placeholder="—">
+          </label>
+          <label>2:00 火力
+            <input type="number" id="planPower200" placeholder="—">
+          </label>
+          <label>8:00 火力
+            <input type="number" id="planPower800" placeholder="—">
+          </label>
+        </div>
+        </div>
+
+        <div id="planCustomSection" hidden>
+        <h3 class="panel__subtitle">自訂操作提醒</h3>
+        <p class="panel__hint">設定時間點與風力或火力數值，開始烘豆後會用嗶聲與語音提醒</p>
+        <div class="inline-form inline-form--top">
+          <div class="field-grid field-grid--3">
+            <label>時間（分:秒）
+              <div class="time-input">
+                <input type="number" id="newPlanEventMin" min="0" placeholder="分">
+                <span>:</span>
+                <input type="number" id="newPlanEventSec" min="0" max="59" placeholder="秒">
+              </div>
+            </label>
+            <label>項目
+              <select id="newPlanEventType" class="field-select">
+                <option value="風力">風力</option>
+                <option value="火力">火力</option>
+              </select>
+            </label>
+            <label>數值
+              <input type="text" id="newPlanEventValue" placeholder="例如：9">
+            </label>
+          </div>
+          <div class="form-error" id="planEventFormError"></div>
+          <button type="button" id="btnAddPlanEvent" class="btn btn--outline btn--sm">新增</button>
+        </div>
+        <div class="plan-custom-lists">
+          <div>
+            <h4 class="list-col-title">風力</h4>
+            <ul id="planEventListWind" class="event-list">
+              <li class="event-list__empty">尚未加入</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="list-col-title">火力</h4>
+            <ul id="planEventListFire" class="event-list">
+              <li class="event-list__empty">尚未加入</li>
+            </ul>
+          </div>
+        </div>
+        </div>
+
         </div>
       </div>
 
@@ -102,15 +196,19 @@
       </div>
 
       <div class="panel">
-        <h2 class="panel__title">烘焙曲線</h2>
+        <div class="panel__head"><h2 class="panel__title">烘焙曲線</h2></div>
+        <div class="panel__body">
         <canvas id="liveCurve" class="curve-canvas"></canvas>
+        </div>
       </div>
 
       <div class="panel">
-        <h2 class="panel__title">記錄</h2>
+        <div class="panel__head"><h2 class="panel__title">記錄</h2></div>
+        <div class="panel__body">
         <ul id="liveLog" class="log-list">
           <li class="log-list__empty">尚無紀錄</li>
         </ul>
+        </div>
       </div>
 
       <div class="roast-footer">
@@ -126,7 +224,8 @@
       </div>
 
       <div class="panel">
-        <h2 class="panel__title">烘焙摘要</h2>
+        <div class="panel__head"><h2 class="panel__title">烘焙摘要</h2></div>
+        <div class="panel__body">
         <dl class="summary-grid" id="summaryGrid">
           <div><dt>發展時間比 DTR</dt><dd id="summaryDtr">—</dd></div>
           <div><dt>總升溫</dt><dd id="summaryRise">—</dd></div>
@@ -135,18 +234,23 @@
         <label>烘豆重量（烘後，g，選填以計算失重）
           <input type="number" id="weightAfter" placeholder="例如：258">
         </label>
+        </div>
       </div>
 
       <div class="panel">
+        <div class="panel__body panel__body--flush">
         <canvas id="resultCurve" class="curve-canvas curve-canvas--lg"></canvas>
+        </div>
       </div>
 
       <div class="panel">
-        <h2 class="panel__title">事件時間軸</h2>
+        <div class="panel__head"><h2 class="panel__title">事件時間軸</h2></div>
+        <div class="panel__body">
         <table class="event-table">
           <thead><tr><th>時間</th><th>事件</th><th>溫度</th></tr></thead>
           <tbody id="eventTableBody"></tbody>
         </table>
+        </div>
       </div>
 
       <div class="result-footer">

@@ -106,6 +106,26 @@ function resumeAudioCtx(){
     audioCtx.resume().catch(function(){});
   }
 }
+// Android Chrome 的自動播放限制比較嚴格：AudioContext 必須在使用者手勢（點擊）當下就實際呼叫
+// resume() 並播放過一次聲音才算「解鎖」，之後計時器（非使用者操作）裡才能正常播放嗶聲，
+// 只呼叫 ensureAudioCtx() 建立 context、卻沒在手勢當下 resume＋播放，就是「Android沒有嗶聲」的主因。
+var audioPrimed = false;
+function primeAudio(){
+  if (audioPrimed) return;
+  var ctx = ensureAudioCtx();
+  if (!ctx) return;
+  try {
+    if (ctx.state === 'suspended') ctx.resume().catch(function(){});
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    gain.gain.value = 0.0001; // 幾乎無聲，只是為了在手勢當下真正跑一次音效解鎖
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.05);
+    audioPrimed = true;
+  } catch (e){}
+}
 function beep(freq, duration, volume){
   var ctx = ensureAudioCtx();
   if (!ctx) return;
@@ -138,16 +158,26 @@ if ('speechSynthesis' in window){
   refreshVoiceCache();
   window.speechSynthesis.onvoiceschanged = refreshVoiceCache;
 }
-// 優先選完全符合 zh-TW 的語音（Android／iPhone 上這通常都是同一套女聲），
-// 找不到才退而求其次找 zh-CN、再退而求其次找任何 zh 語音，避免選到 iPhone 上另一個腔調不同的語音
+// 選女聲的中文語音：光比對語系（zh-TW／zh-CN）選出來的語音在部分 iPhone 上仍可能是男聲，
+// 所以先找名稱有明確標示女聲、或已知平台常見女聲名稱（iOS 的 Mei-Jia、Android/Chrome 的 Ting-Ting 等）的語音，
+// 再排除名稱標示男聲的語音，最後才依語系優先序（zh-TW＞zh-CN＞任何zh）挑選
 function pickZhVoice(){
   var voices = cachedVoices.length ? cachedVoices : (('speechSynthesis' in window) ? window.speechSynthesis.getVoices() : []);
   if (!voices || !voices.length) return null;
-  return voices.find(function(v){ return v.lang === 'zh-TW'; }) ||
-    voices.find(function(v){ return /^zh-TW/i.test(v.lang); }) ||
-    voices.find(function(v){ return /^zh-CN/i.test(v.lang); }) ||
-    voices.find(function(v){ return /^zh/i.test(v.lang); }) ||
-    null;
+  var zhVoices = voices.filter(function(v){ return /^zh/i.test(v.lang); });
+  if (!zhVoices.length) return null;
+
+  var byKnownFemaleName = zhVoices.find(function(v){
+    return /female|女/i.test(v.name) || /mei[-\s]?jia|ting[-\s]?ting|yating|shu-min/i.test(v.name);
+  });
+  if (byKnownFemaleName) return byKnownFemaleName;
+
+  var nonMale = zhVoices.filter(function(v){ return !/male|男/i.test(v.name); });
+  var pool = nonMale.length ? nonMale : zhVoices;
+  return pool.find(function(v){ return v.lang === 'zh-TW'; }) ||
+    pool.find(function(v){ return /^zh-TW/i.test(v.lang); }) ||
+    pool.find(function(v){ return /^zh-CN/i.test(v.lang); }) ||
+    pool[0];
 }
 function speak(text){
   if (!('speechSynthesis' in window)) return;
@@ -179,7 +209,7 @@ function primeSpeech(){
 // 增加 iPhone 在螢幕鎖定、切換App或音訊被系統中斷後恢復正常提醒音的機會
 document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('screen-roast').addEventListener('click', function(){
-    ensureAudioCtx();
+    primeAudio();
     resumeAudioCtx();
     primeSpeech();
   }, true);
@@ -746,7 +776,9 @@ function compute60sRow(cols, isCrackCol){
 }
 
 // 橫向表格：時間為欄，時間/溫度/30秒RoR/60秒RoR/風速/火力為列；targetId 可指定烘豆中或結果頁的表格
+// 烘豆中的表格（liveLogTableBody）額外加一列刪除按鈕，方便刪掉新增錯誤的溫度紀錄
 function renderLogTable(targetId){
+  var isLive = (targetId === 'liveLogTableBody');
   var body = document.getElementById(targetId || 'logTableBody');
   var cols = roast.tempLog.slice().sort(function(a, b){ return a.t - b.t; });
   if (cols.length === 0){
@@ -799,7 +831,32 @@ function renderLogTable(targetId){
     return '<td' + tdClass(null, p.t) + '>' + escapeHtml(findNearestEventForColumn(roast.triggeredLog, '火力', p.t, 20)) + '</td>';
   }).join('') + '</tr>';
 
+  if (isLive){
+    rows += '<tr><th>刪除</th>' + cols.map(function(p){
+      return '<td' + tdClass(null, p.t) + '><button type="button" class="lt-del-btn" data-t="' + p.t + '" aria-label="刪除這筆溫度紀錄">✕</button></td>';
+    }).join('') + '</tr>';
+  }
+
   body.innerHTML = rows;
+}
+
+// 刪除一筆新增錯誤的溫度紀錄（依時間 t 刪除）；若該時間點也是一爆／二爆事件，一併移除對應紀錄，
+// 並重新啟用被停用的爆點按鈕，若移除的是一爆起，也重設發展時間相關狀態
+function deleteTempPoint(t){
+  if (!roast) return;
+  roast.tempLog = roast.tempLog.filter(function(p){ return p.t !== t; });
+  var removedCracks = roast.crackEvents.filter(function(e){ return e.t === t; });
+  roast.crackEvents = roast.crackEvents.filter(function(e){ return e.t !== t; });
+  removedCracks.forEach(function(ev){
+    var btn = document.querySelector('.crack-btn[data-label="' + ev.label + '"]');
+    if (btn) btn.disabled = false;
+    if (ev.label === '一爆起' && roast.firstCrackTime === t){
+      roast.firstCrackTime = null;
+      document.getElementById('devReadout').hidden = true;
+    }
+  });
+  drawLiveCurve();
+  updateRorReadout();
 }
 
 // 生豆資訊表格：帶入設定頁填寫的生豆資訊，targetId 可指定烘豆中或結果頁的表格
@@ -946,6 +1003,8 @@ document.addEventListener('DOMContentLoaded', function(){
     var seconds = (min || 0) * 60 + (sec || 0);
     if (seconds < 0){ err.textContent = '請輸入正確的時間'; return; }
     if (!value || !/^[1-9]$/.test(value)){ err.textContent = '請輸入 1-9 的數值'; return; }
+    var isDuplicate = state.planEvents.some(function(ev){ return ev.type === type && ev.seconds === seconds; });
+    if (isDuplicate){ err.textContent = '這個時間已經設定過' + type + '，請刪除原本的設定或改用其他時間'; return; }
     err.textContent = '';
     state.planEvents.push({ id: uid(), seconds: seconds, type: type, value: value });
     renderPlanEventList();
@@ -968,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('btnStartRoast').addEventListener('click', function(){
     var machineName = machineSelect.value;
     if (!machineName || !document.getElementById('roasterName').value.trim() || !document.getElementById('beanOrigin').value.trim() || !(parseFloat(document.getElementById('weightBefore').value) > 0) || !document.getElementById('sessionTemp').value.trim()) return;
-    ensureAudioCtx();
+    primeAudio();
     primeSpeech();
 
     roast = {
@@ -1122,7 +1181,15 @@ document.addEventListener('DOMContentLoaded', function(){
     resolvePendingConfirm(parseInt(btn.dataset.idx, 10), btn.dataset.action === 'confirm');
   });
 
-  // 更改風力／更改火力：烘豆過程中彈性調整烘焙計劃的數值，輸入框限 1-9，預設帶入目前數值，可用 -/+ 按鈕調整
+  // 刪除新增錯誤的溫度紀錄（烘豆中的表格才有這一列刪除按鈕）
+  document.getElementById('liveLogTableBody').addEventListener('click', function(e){
+    var btn = e.target.closest('.lt-del-btn');
+    if (!btn || !roast) return;
+    if (!window.confirm('確定要刪除這筆溫度紀錄嗎？')) return;
+    deleteTempPoint(parseFloat(btn.dataset.t));
+  });
+
+  // 新增風力／新增火力：烘豆過程中隨時新增一筆風力或火力紀錄，輸入框限 1-9，預設帶入目前數值，可用 -/+ 按鈕調整
   var adjustType = null;
   function openAdjustPanel(type, label){
     adjustType = type;
@@ -1132,8 +1199,8 @@ document.addEventListener('DOMContentLoaded', function(){
     panel.hidden = false;
     panel.classList.add('capture-panel--active');
   }
-  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風力', '更改風力'); });
-  document.getElementById('btnChangePower').addEventListener('click', function(){ openAdjustPanel('火力', '更改火力'); });
+  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風力', '新增風力'); });
+  document.getElementById('btnChangePower').addEventListener('click', function(){ openAdjustPanel('火力', '新增火力'); });
 
   document.getElementById('adjustPanelValue').addEventListener('input', function(){
     var el = document.getElementById('adjustPanelValue');

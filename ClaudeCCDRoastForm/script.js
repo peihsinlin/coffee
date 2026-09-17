@@ -131,6 +131,27 @@ function speak(text){
   u.rate = 1;
   window.speechSynthesis.speak(u);
 }
+// iOS 的語音合成（speechSynthesis）跟 AudioContext 是兩套各自獨立的「解鎖」機制：
+// AudioContext 解鎖了，不代表 speechSynthesis 之後也能在計時器（非使用者操作）裡正常發聲，
+// 一定要先在使用者手勢（點擊）當下實際呼叫過一次 speak()，之後計時器觸發的語音才會真的有聲音，
+// 這極可能就是「風力／火力語音提醒」在 iPhone 上沒有聲音的主因。
+function primeSpeech(){
+  if (!('speechSynthesis' in window)) return;
+  try {
+    var u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0.01;
+    window.speechSynthesis.speak(u);
+  } catch (e){}
+}
+// 烘豆過程中，每次點擊畫面上的按鈕都順便嘗試解鎖／喚醒音效與語音，
+// 增加 iPhone 在螢幕鎖定、切換App或音訊被系統中斷後恢復正常提醒音的機會
+document.addEventListener('DOMContentLoaded', function(){
+  document.getElementById('screen-roast').addEventListener('click', function(){
+    ensureAudioCtx();
+    resumeAudioCtx();
+    primeSpeech();
+  }, true);
+});
 
 // ---------- Wake Lock ----------
 async function requestWakeLock(){
@@ -900,6 +921,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var machineName = machineSelect.value;
     if (!machineName || !document.getElementById('roasterName').value.trim() || !document.getElementById('beanOrigin').value.trim() || !(parseFloat(document.getElementById('weightBefore').value) > 0) || !document.getElementById('sessionTemp').value.trim()) return;
     ensureAudioCtx();
+    primeSpeech();
 
     roast = {
       machineName: machineName,

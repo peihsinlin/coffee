@@ -12,8 +12,8 @@
 <body>
 <div class="app">
   <header class="appbar">
-    <span class="appbar__eyebrow">手機版 · 烘豆助手</span>
-    <span class="appbar__title">烘焙控制台</span>
+    <span class="appbar__eyebrow">C.C.D. 烘豆小助手 手機版</span>
+    <span class="appbar__title" id="appbarTitle">烘焙控制台</span>
   </header>
 
   <main>
@@ -78,15 +78,12 @@
       <div class="panel" id="panel-session" hidden>
         <div class="panel__head"><h2 class="panel__title">豆量及環境</h2></div>
         <div class="panel__body">
-        <div class="field-grid field-grid--3">
-          <label class="label--tight">烘前重量（g） <span class="req">＊必填</span>
+        <div class="field-grid">
+          <label>烘前重量（g） <span class="req">＊必填</span>
             <input type="number" id="weightBefore" placeholder="例如：300">
           </label>
-          <label>溫度（°C）
-            <input type="number" id="sessionTemp" placeholder="選填">
-          </label>
-          <label>濕度（%）
-            <input type="number" id="sessionHumidity" placeholder="選填">
+          <label>溫度（°C） <span class="req">＊必填</span>
+            <input type="number" id="sessionTemp" placeholder="例如：25">
           </label>
         </div>
         </div>
@@ -181,10 +178,24 @@
         <div class="timer-face__label">已烘焙時間</div>
       </div>
       <p class="ror-readout" id="rorReadout">RoR（升溫速率）－</p>
+      <p class="dev-readout" id="devReadout" hidden>發展時間 00:00（0.0%）</p>
 
       <div class="control-row">
         <button type="button" id="btnPauseResume" class="btn btn--ghost">暫停</button>
         <button type="button" id="btnManualTemp" class="btn btn--ghost">手動記錄溫度</button>
+        <button type="button" id="btnEndRoastQuick" class="btn btn--danger">結束烘豆</button>
+      </div>
+
+      <div class="control-row">
+        <button type="button" id="btnChangeFan" class="btn btn--ghost">更改風力</button>
+        <button type="button" id="btnChangePower" class="btn btn--ghost">更改火力</button>
+      </div>
+
+      <div class="crack-btn-row">
+        <button type="button" class="btn btn--sm crack-btn" data-label="一爆起">一爆起</button>
+        <button type="button" class="btn btn--sm crack-btn" data-label="一爆止">一爆止</button>
+        <button type="button" class="btn btn--sm crack-btn" data-label="二爆起">二爆起</button>
+        <button type="button" class="btn btn--sm crack-btn" data-label="二爆止">二爆止</button>
       </div>
 
       <div id="tempPrompt" class="capture-panel" hidden>
@@ -195,6 +206,24 @@
         </form>
       </div>
 
+      <div id="eventConfirmPanel" class="capture-panel" hidden>
+        <div class="capture-panel__label">操作提醒確認（10秒內無動作將自動寫入）</div>
+        <div id="eventConfirmList" class="event-confirm-list"></div>
+      </div>
+
+      <div id="adjustPanel" class="capture-panel" hidden>
+        <div class="capture-panel__label" id="adjustPanelLabel">設定數值</div>
+        <div class="adjust-input-row">
+          <button type="button" id="adjustPanelMinus" class="btn btn--outline btn--sm adjust-step">－</button>
+          <input type="text" inputmode="numeric" pattern="[1-9]" maxlength="1" id="adjustPanelValue" class="adjust-value-input" value="5">
+          <button type="button" id="adjustPanelPlus" class="btn btn--outline btn--sm adjust-step">＋</button>
+        </div>
+        <div class="control-row">
+          <button type="button" id="btnAdjustCancel" class="btn btn--outline">取消</button>
+          <button type="button" id="btnAdjustSubmit" class="btn btn--primary">送出</button>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel__head"><h2 class="panel__title">烘焙曲線</h2></div>
         <div class="panel__body">
@@ -203,11 +232,22 @@
       </div>
 
       <div class="panel">
-        <div class="panel__head"><h2 class="panel__title">記錄</h2></div>
-        <div class="panel__body">
-        <ul id="liveLog" class="log-list">
-          <li class="log-list__empty">尚無紀錄</li>
-        </ul>
+        <div class="panel__head"><h2 class="panel__title">生豆資訊</h2></div>
+        <div class="panel__body panel__body--flush">
+        <table class="bean-info-table">
+          <tbody id="liveBeanInfoBody"></tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">事件時間軸</h2></div>
+        <div class="panel__body panel__body--flush">
+        <div class="table-scroll">
+          <table class="log-table">
+            <tbody id="liveLogTableBody"></tbody>
+          </table>
+        </div>
         </div>
       </div>
 
@@ -231,9 +271,24 @@
           <div><dt>總升溫</dt><dd id="summaryRise">—</dd></div>
           <div><dt>失重</dt><dd id="summaryLoss">—</dd></div>
         </dl>
-        <label>烘豆重量（烘後，g，選填以計算失重）
-          <input type="number" id="weightAfter" placeholder="例如：258">
-        </label>
+        <div class="field-grid">
+          <label>烘後重量（g）
+            <input type="number" id="weightAfter" placeholder="例如：258">
+          </label>
+          <label>烘焙度（豆）
+            <input type="number" step="0.1" id="roastLevelBean" placeholder="例如：72.8">
+          </label>
+          <label>烘焙度（粗粉）
+            <input type="number" step="0.1" id="roastLevelCoarse" placeholder="選填">
+          </label>
+          <label>烘焙度（細粉）
+            <input type="number" step="0.1" id="roastLevelFine" placeholder="選填">
+          </label>
+        </div>
+        <dl class="summary-grid">
+          <div><dt>粗粉差</dt><dd id="diffCoarse">—</dd></div>
+          <div><dt>細粉差</dt><dd id="diffFine">—</dd></div>
+        </dl>
         </div>
       </div>
 
@@ -244,17 +299,30 @@
       </div>
 
       <div class="panel">
-        <div class="panel__head"><h2 class="panel__title">事件時間軸</h2></div>
-        <div class="panel__body">
-        <table class="event-table">
-          <thead><tr><th>時間</th><th>事件</th><th>溫度</th></tr></thead>
-          <tbody id="eventTableBody"></tbody>
+        <div class="panel__head"><h2 class="panel__title">生豆資訊</h2></div>
+        <div class="panel__body panel__body--flush">
+        <table class="bean-info-table">
+          <tbody id="resultBeanInfoBody"></tbody>
         </table>
         </div>
       </div>
 
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">事件時間軸</h2></div>
+        <div class="panel__body panel__body--flush">
+        <div class="table-scroll">
+          <table class="log-table">
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+        </div>
+      </div>
+
       <div class="result-footer">
-        <button type="button" id="btnExportJpg" class="btn btn--primary btn--block">匯出成 JPG</button>
+        <div class="control-row">
+          <button type="button" id="btnPrintRoast" class="btn btn--outline">列印烘焙紀錄</button>
+          <button type="button" id="btnExportJpg" class="btn btn--primary">匯出成 JPG</button>
+        </div>
         <button type="button" id="btnNewRoast" class="btn btn--ghost btn--block">開始新的烘焙</button>
       </div>
     </section>

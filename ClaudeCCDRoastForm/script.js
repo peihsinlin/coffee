@@ -25,7 +25,8 @@ function updateStartButton(){
   var nameOk = document.getElementById('roasterName').value.trim() !== '';
   var regionOk = document.getElementById('beanOrigin').value.trim() !== '';
   var weightOk = parseFloat(document.getElementById('weightBefore').value) > 0;
-  document.getElementById('btnStartRoast').disabled = !(machineOk && nameOk && regionOk && weightOk);
+  var tempOk = document.getElementById('sessionTemp').value.trim() !== '';
+  document.getElementById('btnStartRoast').disabled = !(machineOk && nameOk && regionOk && weightOk && tempOk);
 }
 
 // ---------- 自訂操作提醒（風力／火力） ----------
@@ -92,14 +93,14 @@ function ensureAudioCtx(){
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-function beep(freq, duration){
+function beep(freq, duration, volume){
   var ctx = ensureAudioCtx();
   if (!ctx) return;
   var osc = ctx.createOscillator();
   var gain = ctx.createGain();
   osc.type = 'sine';
   osc.frequency.value = freq;
-  gain.gain.value = 0.28;
+  gain.gain.value = (volume != null) ? volume : 0.45;
   osc.connect(gain);
   gain.connect(ctx.destination);
   osc.start();
@@ -146,7 +147,118 @@ function resizeCanvas(canvas){
   return ctx;
 }
 
-function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog){
+// 用二次貝茲曲線通過線段中點，讓折線看起來是平滑曲線
+function strokeSmoothPath(ctx, pts){
+  if (pts.length === 0) return;
+  ctx.beginPath();
+  if (pts.length === 1){
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    ctx.lineTo(pts[0][0] + 0.01, pts[0][1]);
+    ctx.stroke();
+    return;
+  }
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (var i = 1; i < pts.length; i++){
+    var prev = pts[i - 1], curr = pts[i];
+    var midX = (prev[0] + curr[0]) / 2, midY = (prev[1] + curr[1]) / 2;
+    ctx.quadraticCurveTo(prev[0], prev[1], midX, midY);
+  }
+  var last = pts[pts.length - 1];
+  ctx.lineTo(last[0], last[1]);
+  ctx.stroke();
+}
+
+// 計算 RoR（升溫速率，°C/分鐘），優先用60秒間隔，不足時用30秒間隔*2估算
+function computeRorSeries(tempLog){
+  var out = [];
+  tempLog.forEach(function(p){
+    var past60 = findPointNear(tempLog, p.t - 60, 8);
+    var val = null;
+    if (past60){ val = p.temp - past60.temp; }
+    else {
+      var past30 = findPointNear(tempLog, p.t - 30, 5);
+      if (past30) val = (p.temp - past30.temp) * 2;
+    }
+    if (val != null) out.push({ t: p.t, ror: val });
+  });
+  return out;
+}
+
+function hasFanPowerEvents(triggeredLog){
+  return triggeredLog.some(function(ev){ return ev.label.indexOf('風力') === 0 || ev.label.indexOf('火力') === 0; });
+}
+
+// 風力／火力階梯圖，畫在主曲線下方，藍色F=風力、橘色P=火力，仿照烘豆機軟體常見畫法
+// 風力／火力階梯圖：F、P 共用同一個數值刻度，數值相同時線會交叉，畫法參考烘豆機軟體常見樣式
+function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
+  var allVals = fanItems.concat(powerItems)
+    .map(function(it){ var v = parseFloat(it.value); return isNaN(v) ? null : v; })
+    .filter(function(v){ return v != null; });
+  var vMax = allVals.length ? Math.max.apply(null, allVals.concat([1])) : 1;
+  var vMin = 0;
+  var padTop = 14, padBottom = 14;
+  var plotTop = yTop + padTop, plotBottom = yTop + bandH - padBottom;
+
+  function yFor(v){
+    if (v == null) return (plotTop + plotBottom) / 2;
+    var clamped = Math.max(vMin, Math.min(vMax, v));
+    return plotBottom - (clamped - vMin) / (vMax - vMin || 1) * (plotBottom - plotTop);
+  }
+
+  function drawLine(items, color){
+    if (items.length === 0) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    var lastX = null, lastY = null;
+    items.forEach(function(it, i){
+      var v = parseFloat(it.value); v = isNaN(v) ? null : v;
+      var x = xScale(it.t);
+      var y = yFor(v);
+      if (i === 0){ ctx.moveTo(x, y); }
+      else { ctx.lineTo(x, lastY); ctx.lineTo(x, y); }
+      lastX = x; lastY = y;
+    });
+    if (lastX != null){ ctx.lineTo(x0 + w - 4, lastY); }
+    ctx.stroke();
+  }
+
+  function drawBadges(items, color, prefix){
+    items.forEach(function(it){
+      var v = parseFloat(it.value); v = isNaN(v) ? null : v;
+      var x = xScale(it.t);
+      var y = yFor(v);
+      var text = prefix + it.value;
+      ctx.font = 'bold 9px sans-serif';
+      var tw = ctx.measureText(text).width;
+      var bw = tw + 8, bh = 13;
+      var bx = Math.max(x0, Math.min(x0 + w - bw, x - bw / 2));
+      var by = Math.max(yTop + 1, Math.min(yTop + bandH - bh - 1, y - bh - 3));
+      ctx.fillStyle = color;
+      if (ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill(); }
+      else { ctx.fillRect(bx, by, bw, bh); }
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, bx + bw / 2, by + bh - 3.5);
+    });
+  }
+
+  drawLine(fanItems, '#3E6B8A');
+  drawLine(powerItems, '#BD6B2E');
+  drawBadges(fanItems, '#3E6B8A', 'F');
+  drawBadges(powerItems, '#BD6B2E', 'P');
+
+  // 左側小圖例
+  ctx.font = 'bold 9px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#3E6B8A'; ctx.fillText('F 風力', x0, yTop - 2);
+  ctx.fillStyle = '#BD6B2E'; ctx.fillText('P 火力', x0 + 44, yTop - 2);
+}
+
+function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackEvents){
+  stepBandH = stepBandH || 0;
+  var stepGap = stepBandH > 0 ? 22 : 0;
+
   ctx.fillStyle = '#241712';
   ctx.fillRect(x0, y0, w, h);
   ctx.strokeStyle = 'rgba(243,232,211,0.14)';
@@ -161,8 +273,9 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog){
     return;
   }
 
-  var padL = 40, padR = 14, padT = 14, padB = 24;
-  var plotW = w - padL - padR, plotH = h - padT - padB;
+  var mainH = h - stepBandH - stepGap;
+  var padL = 40, padR = 34, padT = 14, padB = 24;
+  var plotW = w - padL - padR, plotH = mainH - padT - padB;
 
   var allT = tempLog.map(function(p){ return p.t; }).concat(triggeredLog.map(function(e){ return e.t; }));
   var maxT = Math.max.apply(null, allT.concat([60]));
@@ -174,7 +287,7 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog){
   function xScale(t){ return x0 + padL + (t / maxT) * plotW; }
   function yScale(temp){ return y0 + padT + (1 - (temp - minTemp) / (maxTemp - minTemp)) * plotH; }
 
-  // 溫度格線
+  // 溫度格線（左軸）
   ctx.strokeStyle = 'rgba(243,232,211,0.08)';
   ctx.fillStyle = '#c9b693';
   ctx.font = '10px monospace';
@@ -186,37 +299,113 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog){
     ctx.fillText(String(t), x0 + padL - 6, y + 3);
   }
 
-  // 事件標記線
-  triggeredLog.forEach(function(ev){
-    var x = xScale(ev.t);
-    ctx.strokeStyle = '#BD6B2E';
-    ctx.setLineDash([4, 3]);
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, y0 + padT); ctx.lineTo(x, y0 + h - padB); ctx.stroke();
-    ctx.setLineDash([]);
+  // RoR 副軸（右側刻度）
+  var rorSeries = computeRorSeries(tempLog);
+  var rorMax = 60;
+  if (rorSeries.length){
+    var maxAbs = Math.max.apply(null, rorSeries.map(function(r){ return Math.abs(r.ror); }).concat([10]));
+    rorMax = Math.max(60, Math.ceil(maxAbs / 10) * 10);
+  }
+  function yScaleRor(v){
+    var clamped = Math.max(0, Math.min(rorMax, v));
+    return y0 + padT + (1 - clamped / rorMax) * plotH;
+  }
+  ctx.fillStyle = '#8B3A2B';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'left';
+  var rorStep = rorMax / 4;
+  for (var rv = 0; rv <= rorMax; rv += rorStep){
+    ctx.fillText(String(Math.round(rv)), x0 + w - padR + 4, yScaleRor(rv) + 3);
+  }
+
+  // 一爆／二爆事件：在曲線上標出小圓點（標籤稍後畫在曲線之上）
+  ctx.fillStyle = '#BD6B2E';
+  (crackEvents || []).forEach(function(ev){
+    ctx.beginPath(); ctx.arc(xScale(ev.t), yScale(ev.temp), 3.5, 0, Math.PI * 2); ctx.fill();
   });
 
-  // 溫度曲線
+  // 溫度曲線（平滑）
+  var tempPts = tempLog.map(function(p){ return [xScale(p.t), yScale(p.temp)]; });
   ctx.strokeStyle = '#5B6B3E';
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  tempLog.forEach(function(p, i){
-    var x = xScale(p.t), y = yScale(p.temp);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+  strokeSmoothPath(ctx, tempPts);
   ctx.fillStyle = '#5B6B3E';
   tempLog.forEach(function(p){
     ctx.beginPath(); ctx.arc(xScale(p.t), yScale(p.temp), 2.5, 0, Math.PI * 2); ctx.fill();
   });
 
-  // 事件文字標籤
-  ctx.fillStyle = '#F3E9D8';
+  // RoR 曲線（平滑，另一個顏色）
+  if (rorSeries.length > 1){
+    var rorPts = rorSeries.map(function(r){ return [xScale(r.t), yScaleRor(r.ror)]; });
+    ctx.strokeStyle = '#8B3A2B';
+    ctx.lineWidth = 1.5;
+    strokeSmoothPath(ctx, rorPts);
+  }
+
+  // 一爆／二爆事件標註：仿照斜線引出標籤，兩行文字（第一行事件名稱+時間、第二行溫度）行距緊靠、不佔太多畫面，文字都在指標左邊避免超出圖表
+  // 依時間排序後，不同事件錯開標註：第一個在下方、下一個在上方，依序交錯，避免相鄰事件重疊；
+  // 若同一側仍有時間太接近的事件，再逐層外推位置（往左、往外加大間距）
+  var sortedEvents = (crackEvents || []).slice().sort(function(a, b){ return a.t - b.t; });
+  var collisionThreshold = 65; // px，小於此距離視為時間接近
+  var lastXBySide = { below: null, above: null };
+  var levelBySide = { below: 0, above: 0 };
+  sortedEvents.forEach(function(ev, idx){
+    var side = (idx % 2 === 0) ? 'below' : 'above';
+    ev._side = side;
+    var x = xScale(ev.t);
+    if (lastXBySide[side] !== null && Math.abs(x - lastXBySide[side]) < collisionThreshold){
+      levelBySide[side]++;
+    } else {
+      levelBySide[side] = 0;
+    }
+    ev._labelLevel = levelBySide[side];
+    lastXBySide[side] = x;
+  });
+
+  var lineGap = 11; // 兩行文字緊靠，避免佔用太多畫面
+  sortedEvents.forEach(function(ev){
+    var x = xScale(ev.t);
+    var y = yScale(ev.temp);
+    var lvl = ev._labelLevel || 0;
+    var extraGap = lvl * 22;
+    var extraShift = lvl * 42;
+    var minY = y0 + padT + 4;
+    var maxY = y0 + mainH - padB - 4 - lineGap;
+    var line1Y, line2Y;
+    if (ev._side === 'below'){
+      line1Y = Math.max(minY, Math.min(maxY, y + 18 + extraGap));
+      line2Y = line1Y + lineGap;
+    } else {
+      line2Y = Math.max(minY + lineGap, Math.min(maxY + lineGap, y - 12 - extraGap));
+      line1Y = line2Y - lineGap;
+    }
+    var labelX = x - 12 - extraShift;
+    var textX = x - 15 - extraShift;
+
+    ctx.strokeStyle = '#BD6B2E';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(labelX, (line1Y + line2Y) / 2); ctx.stroke();
+
+    // 第一行：事件名稱＋時間
+    ctx.fillStyle = '#F3E9D8';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(ev.label + ' ' + formatTime(ev.t), textX, line1Y);
+
+    // 第二行：溫度數值
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(ev.temp + '°C', textX, line2Y);
+  });
+
+  // 圖例（放左上，避免擋到右側事件標註）
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'left';
-  triggeredLog.forEach(function(ev){
-    ctx.fillText(ev.label, xScale(ev.t) + 3, y0 + padT + 10);
-  });
+  ctx.strokeStyle = '#5B6B3E'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x0 + padL + 4, y0 + 14); ctx.lineTo(x0 + padL + 18, y0 + 14); ctx.stroke();
+  ctx.fillStyle = '#F3E9D8'; ctx.fillText('BT', x0 + padL + 22, y0 + 17);
+  ctx.strokeStyle = '#8B3A2B'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x0 + padL + 4, y0 + 28); ctx.lineTo(x0 + padL + 18, y0 + 28); ctx.stroke();
+  ctx.fillStyle = '#F3E9D8'; ctx.fillText('RoR', x0 + padL + 22, y0 + 31);
 
   // 時間刻度
   ctx.fillStyle = '#c9b693';
@@ -224,25 +413,46 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog){
   ctx.textAlign = 'center';
   var xStep = maxT > 600 ? 120 : 60;
   for (var tt = 0; tt <= maxT; tt += xStep){
-    ctx.fillText(formatTime(tt), xScale(tt), y0 + h - 8);
+    ctx.fillText(formatTime(tt), xScale(tt), y0 + mainH - 8);
+  }
+
+  // 風力／火力階梯圖（僅在有這類事件時顯示），跟上方圖表隔開一段距離
+  if (stepBandH > 0){
+    var stepTop = y0 + mainH + stepGap;
+    ctx.strokeStyle = 'rgba(243,232,211,0.14)';
+    ctx.beginPath(); ctx.moveTo(x0, stepTop - stepGap / 2); ctx.lineTo(x0 + w, stepTop - stepGap / 2); ctx.stroke();
+    var fanItems = triggeredLog.filter(function(ev){ return ev.label.indexOf('風力') === 0; })
+      .map(function(ev){ return { t: ev.t, value: ev.label.replace('風力 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
+    var powerItems = triggeredLog.filter(function(ev){ return ev.label.indexOf('火力') === 0; })
+      .map(function(ev){ return { t: ev.t, value: ev.label.replace('火力 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
+    drawStepChart(ctx, x0 + padL, stepTop, w - padL - padR, stepBandH, xScale, fanItems, powerItems);
   }
 }
 
 function drawLiveCurve(){
   var canvas = document.getElementById('liveCurve');
+  var hasFP = hasFanPowerEvents(roast.triggeredLog);
+  var stepBandH = hasFP ? 90 : 0;
+  canvas.style.height = (180 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog);
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents);
+  renderBeanInfoTable('liveBeanInfoBody');
+  renderLogTable('liveLogTableBody');
 }
 function drawResultCurve(){
   var canvas = document.getElementById('resultCurve');
+  var hasFP = hasFanPowerEvents(roast.triggeredLog);
+  var stepBandH = hasFP ? 100 : 0;
+  canvas.style.height = (260 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog);
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents);
 }
 
 // ---------- 溫度輸入面板 ----------
-function showTempPrompt(auto){
+function showTempPrompt(auto, crackLabel){
   var panel = document.getElementById('tempPrompt');
-  document.getElementById('tempPromptLabel').textContent = auto ? '請輸入目前溫度' : '手動記錄溫度';
+  var label = crackLabel ? ('請輸入「' + crackLabel + '」溫度') : (auto ? '請輸入目前溫度' : '手動記錄溫度');
+  document.getElementById('tempPromptLabel').textContent = label;
   document.getElementById('tempPromptInput').value = '';
   panel.hidden = false;
   panel.classList.add('capture-panel--active');
@@ -254,13 +464,70 @@ function hideTempPrompt(){
   panel.classList.remove('capture-panel--active');
 }
 
-function addLiveLogRow(elapsed, text){
-  var list = document.getElementById('liveLog');
-  var empty = list.querySelector('.log-list__empty');
-  if (empty) empty.remove();
-  var li = document.createElement('li');
-  li.innerHTML = '<span>' + formatTime(elapsed) + '</span><span>' + escapeHtml(text) + '</span>';
-  list.insertBefore(li, list.firstChild);
+// ---------- 風力／火力提醒的確認提示（時間到時除了語音提示外，需按確認才寫入紀錄；超過10秒沒動作則自動寫入） ----------
+// 若風力、火力同時到達提醒時間，兩筆會同時列出，各自獨立確認／倒數，不互相排隊等待
+function renderConfirmPanel(){
+  var panel = document.getElementById('eventConfirmPanel');
+  var list = document.getElementById('eventConfirmList');
+  if (!roast || roast.pendingConfirms.length === 0){
+    panel.hidden = true;
+    panel.classList.remove('capture-panel--active');
+    list.innerHTML = '';
+    return;
+  }
+  panel.hidden = false;
+  panel.classList.add('capture-panel--active');
+  list.innerHTML = roast.pendingConfirms.map(function(item, idx){
+    return '<div class="event-confirm-item">' +
+      '<span class="event-confirm-item__label">' + escapeHtml(item.label) + '（' + formatTime(item.t) + '）</span>' +
+      '<div class="control-row">' +
+        '<button type="button" data-action="cancel" data-idx="' + idx + '" class="btn btn--outline btn--sm">取消</button>' +
+        '<button type="button" data-action="confirm" data-idx="' + idx + '" class="btn btn--primary btn--sm">確認寫入</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+function resolvePendingConfirm(idx, write){
+  if (!roast) return;
+  var item = roast.pendingConfirms[idx];
+  if (!item) return;
+  clearTimeout(item.timer);
+  roast.pendingConfirms.splice(idx, 1);
+  if (write){
+    roast.triggeredLog.push({ t: item.t, label: item.label, temp: item.temp });
+    drawLiveCurve();
+  }
+  renderConfirmPanel();
+}
+function hideEventConfirm(){
+  if (roast && roast.pendingConfirms){
+    roast.pendingConfirms.forEach(function(item){ clearTimeout(item.timer); });
+    roast.pendingConfirms = [];
+  }
+  var panel = document.getElementById('eventConfirmPanel');
+  panel.hidden = true;
+  panel.classList.remove('capture-panel--active');
+  document.getElementById('eventConfirmList').innerHTML = '';
+}
+
+// ---------- 烘豆中彈性更改風力／火力 ----------
+function hideAdjustPanel(){
+  var panel = document.getElementById('adjustPanel');
+  panel.hidden = true;
+  panel.classList.remove('capture-panel--active');
+}
+function clampAdjustValue(v){
+  v = parseInt(v, 10);
+  if (isNaN(v)) return 5;
+  return Math.max(1, Math.min(9, v));
+}
+// 找出目前的風力／火力數值（紀錄中該類型最新一筆），沒有紀錄時預設 5
+function getCurrentAdjustValue(type){
+  if (!roast) return 5;
+  var matches = roast.triggeredLog.filter(function(ev){ return ev.label.indexOf(type + ' ') === 0; });
+  if (matches.length === 0) return 5;
+  var latest = matches.reduce(function(a, b){ return a.t > b.t ? a : b; });
+  return clampAdjustValue(latest.label.slice(type.length + 1));
 }
 
 function findNearestTemp(tempLog, t){
@@ -308,16 +575,17 @@ function computeSummary(){
   if (!roast) return summary;
 
   // 發展時間比 DTR = (結束時間 - 一爆開始時間) / 結束時間
-  var firstCrack = findEventByKeyword(roast.triggeredLog, '一爆');
-  var dropEvent = findEventByKeyword(roast.triggeredLog, '下豆');
+  var firstCrack = findEventByKeyword(roast.crackEvents, '一爆');
+  var dropEvent = findEventByKeyword(roast.crackEvents, '結束烘豆') || findEventByKeyword(roast.crackEvents, '下豆');
   var endT = dropEvent ? dropEvent.t : roast.elapsed;
   if (firstCrack && endT > firstCrack.t){
-    var dtr = ((endT - firstCrack.t) / endT) * 100;
-    summary.dtrText = dtr.toFixed(1) + '%';
+    var devTime = endT - firstCrack.t;
+    var dtr = (devTime / endT) * 100;
+    summary.dtrText = formatTime(devTime) + '　' + dtr.toFixed(1) + '%';
   }
 
   // 總升溫 = 下豆溫度（或最後一筆溫度）－ 回溫點溫度（或第一筆溫度）
-  var tp = findEventByKeyword(roast.triggeredLog, '回溫');
+  var tp = findEventByKeyword(roast.crackEvents, '回溫');
   var startTemp = tp && tp.temp != null ? tp.temp : (roast.tempLog[0] ? roast.tempLog[0].temp : null);
   var endTemp = dropEvent && dropEvent.temp != null ? dropEvent.temp : (roast.tempLog.length ? roast.tempLog[roast.tempLog.length - 1].temp : null);
   if (startTemp != null && endTemp != null){
@@ -335,12 +603,137 @@ function computeSummary(){
   return summary;
 }
 
+// 找出離 targetT 最近、且在 tolerance 秒內的觸發事件，用來對齊表格欄位
+function findNearestEventForColumn(triggeredLog, prefix, targetT, tolerance){
+  var best = null, bestDiff = tolerance;
+  triggeredLog.forEach(function(ev){
+    if (ev.label.indexOf(prefix) !== 0) return;
+    var diff = Math.abs(ev.t - targetT);
+    if (diff <= bestDiff){ bestDiff = diff; best = ev; }
+  });
+  return best ? best.label.replace(prefix + ' ', '') : '';
+}
+
+// 計算「60秒升溫」列該顯示在哪些欄位、以及對應的溫度差
+// 由於溫度紀錄的實際時間點會因手動送出延遲而偏離整30秒格（累積後可能偏離超過原本±5秒的容許值），
+// 改用「找出離每個整分鐘標記最近的欄位」來決定顯示欄位，並動態往回找最接近60秒前的溫度點來計算溫度差，
+// 不再假設「往回數兩欄一定是60秒前」，避免夾雜手動溫度／事件時間點時算錯或漏算
+function compute60sRow(cols, isCrackCol){
+  var n = cols.length;
+  if (n === 0) return [];
+  var maxT = cols[n - 1].t;
+  var pickedIdx = {};
+  var usedIdx = {};
+  for (var m = 60; m <= maxT + 25; m += 60){
+    var bestIdx = -1, bestDiff = 25; // 只在離整分鐘 25 秒內才算「接近整分鐘」
+    cols.forEach(function(p, idx){
+      if (isCrackCol(p.t) || usedIdx[idx]) return;
+      var diff = Math.abs(p.t - m);
+      if (diff < bestDiff){ bestDiff = diff; bestIdx = idx; }
+    });
+    if (bestIdx !== -1){ pickedIdx[bestIdx] = true; usedIdx[bestIdx] = true; }
+  }
+
+  return cols.map(function(p, i){
+    if (isCrackCol(p.t) || !pickedIdx[i]) return null;
+    var target = p.t - 60;
+    var best = null, bestDiff = 20;
+    for (var k = i - 1; k >= 0; k--){
+      if (isCrackCol(cols[k].t)) continue;
+      var diff = Math.abs(cols[k].t - target);
+      if (diff < bestDiff){ bestDiff = diff; best = cols[k]; }
+    }
+    if (!best) return null;
+    return Math.round(p.temp - best.temp);
+  });
+}
+
+// 橫向表格：時間為欄，時間/溫度/30秒RoR/60秒RoR/風速/火力為列；targetId 可指定烘豆中或結果頁的表格
+function renderLogTable(targetId){
+  var body = document.getElementById(targetId || 'logTableBody');
+  var cols = roast.tempLog.slice().sort(function(a, b){ return a.t - b.t; });
+  if (cols.length === 0){
+    body.innerHTML = '<tr><th></th><td class="log-table__empty">尚無溫度紀錄</td></tr>';
+    return;
+  }
+
+  var rows = '';
+  var crackTimes = (roast.crackEvents || []).map(function(e){ return e.t; });
+  function isCrackCol(t){ return crackTimes.indexOf(t) !== -1; }
+  function tdClass(base, t){
+    var classes = [];
+    if (base) classes.push(base);
+    if (isCrackCol(t)) classes.push('lt-event-col');
+    return classes.length ? (' class="' + classes.join(' ') + '"') : '';
+  }
+
+  rows += '<tr><th>時間</th>' + cols.map(function(p){
+    return '<td' + tdClass(null, p.t) + '>' + formatTime(p.t) + '</td>';
+  }).join('') + '</tr>';
+
+  rows += '<tr><th>溫度</th>' + cols.map(function(p){
+    return '<td' + tdClass('lt-temp', p.t) + '>' + p.temp + '</td>';
+  }).join('') + '</tr>';
+
+  rows += '<tr><th>30&quot;</th>' + cols.map(function(p, i){
+    if (i === 0 || isCrackCol(p.t)) return '<td' + tdClass(null, p.t) + '></td>';
+    var v = Math.round(p.temp - cols[i - 1].temp);
+    return '<td' + tdClass('lt-ror', p.t) + '>' + v + '</td>';
+  }).join('') + '</tr>';
+
+  var row60 = compute60sRow(cols, isCrackCol);
+  rows += '<tr><th>60&quot;</th>' + cols.map(function(p, i){
+    var v = row60[i];
+    if (v == null) return '<td' + tdClass(null, p.t) + '></td>';
+    return '<td' + tdClass('lt-ror lt-ror-strong', p.t) + '>' + v + '</td>';
+  }).join('') + '</tr>';
+
+  rows += '<tr><th>事件</th>' + cols.map(function(p){
+    var ev = (roast.crackEvents || []).find(function(e){ return e.t === p.t; });
+    return '<td' + tdClass(ev ? 'lt-event-cell' : null, p.t) + '>' + (ev ? escapeHtml(ev.label) : '') + '</td>';
+  }).join('') + '</tr>';
+
+  rows += '<tr><th>風速</th>' + cols.map(function(p){
+    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(findNearestEventForColumn(roast.triggeredLog, '風力', p.t, 20)) + '</td>';
+  }).join('') + '</tr>';
+
+  rows += '<tr><th>火力</th>' + cols.map(function(p){
+    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(findNearestEventForColumn(roast.triggeredLog, '火力', p.t, 20)) + '</td>';
+  }).join('') + '</tr>';
+
+  body.innerHTML = rows;
+}
+
+// 生豆資訊表格：帶入設定頁填寫的生豆資訊，targetId 可指定烘豆中或結果頁的表格
+function renderBeanInfoTable(targetId){
+  var body = document.getElementById(targetId);
+  if (!body || !roast) return;
+  var b = roast.greenBean || {};
+  function v(val){ return val ? escapeHtml(val) : '—'; }
+  var rows =
+    '<tr><th>國家／地區</th><td>' + v(b.origin) + '</td><th>莊園</th><td>' + v(b.farm) + '</td></tr>' +
+    '<tr><th>公司</th><td>' + v(b.company) + '</td><th>品種</th><td>' + v(b.variety) + '</td></tr>' +
+    '<tr><th>處理法</th><td>' + v(b.process) + '</td><th>價格／1kg</th><td>' + v(b.price) + '</td></tr>' +
+    '<tr><th>瑕疵率（%）</th><td>' + v(b.defectRate) + '</td><th>含水率（%）</th><td>' + v(b.moisture) + '</td></tr>' +
+    '<tr><th>密度</th><td>' + v(b.density) + '</td><th>備註</th><td>' + v(b.notes) + '</td></tr>';
+  body.innerHTML = rows;
+}
+
 function renderSummary(){
   var s = computeSummary();
   document.getElementById('summaryDtr').textContent = s.dtrText;
   document.getElementById('summaryRise').textContent = s.riseText;
   document.getElementById('summaryLoss').textContent = s.lossText;
   return s;
+}
+
+// 粗粉差／細粉差 = 烘焙度（豆）－ 烘焙度（粗粉／細粉）
+function updateRoastLevelDiffs(){
+  var bean = parseFloat(document.getElementById('roastLevelBean').value);
+  var coarse = parseFloat(document.getElementById('roastLevelCoarse').value);
+  var fine = parseFloat(document.getElementById('roastLevelFine').value);
+  document.getElementById('diffCoarse').textContent = (!isNaN(bean) && !isNaN(coarse)) ? (bean - coarse).toFixed(1) : '—';
+  document.getElementById('diffFine').textContent = (!isNaN(bean) && !isNaN(fine)) ? (bean - fine).toFixed(1) : '—';
 }
 
 // ---------- 計時器 ----------
@@ -350,29 +743,54 @@ function tick(){
   roast.elapsed = elapsed;
   document.getElementById('timerDisplay').textContent = formatTime(elapsed);
 
-  if (elapsed > 0 && elapsed % 30 === 27 && roast.lastWarnAt !== elapsed){
-    roast.lastWarnAt = elapsed;
-    beep(660, 90); // 提前3秒的預警音，提醒先看一眼溫度
+  if (roast.firstCrackTime != null){
+    var devTime = elapsed - roast.firstCrackTime;
+    var devPercent = elapsed > 0 ? (devTime / elapsed * 100) : 0;
+    document.getElementById('devReadout').textContent = '發展時間 ' + formatTime(devTime) + '（' + devPercent.toFixed(1) + '%）';
   }
 
-  if (elapsed > 0 && elapsed % 30 === 0 && roast.lastPromptAt !== elapsed){
+  // 提前3秒／2秒／1秒的「嘟」提示音，讓人先準備看溫度
+  if (elapsed > 0 && (elapsed % 30 === 27 || elapsed % 30 === 28 || elapsed % 30 === 29) && roast.lastDuduAt !== elapsed){
+    roast.lastDuduAt = elapsed;
+    beep(600, 90, 0.55);
+  }
+
+  // 第30秒整的「嗶」聲，並跳出溫度輸入
+  var onGridMark = (elapsed > 0 && elapsed % 30 === 0);
+  if (onGridMark && roast.lastPromptAt !== elapsed){
     roast.lastPromptAt = elapsed;
-    beep(880, 150);
+    beep(1000, 220, 0.6);
+    roast.pendingCrackLabel = null;
     showTempPrompt(true);
   }
 
+  var hasNewConfirm = false;
   roast.events.forEach(function(ev){
     if (!ev.triggered && elapsed >= ev.seconds){
       ev.triggered = true;
+      hasNewConfirm = true;
       var nearestTemp = findNearestTemp(roast.tempLog, elapsed);
-      roast.triggeredLog.push({ t: elapsed, label: ev.label, temp: nearestTemp });
-      beep(720, 120);
-      setTimeout(function(){ beep(720, 120); }, 180);
-      speak(ev.label);
-      addLiveLogRow(elapsed, '事件：' + ev.label);
-      drawLiveCurve();
+      // 時間到了先用語音／嗶聲提醒，實際是否寫入紀錄改由彈出的確認提示決定；若風力、火力同時到時間，會同時列在提示清單中
+      var pending = { t: elapsed, label: ev.label, temp: nearestTemp, timer: null };
+      pending.timer = setTimeout(function(){
+        var idx = roast.pendingConfirms.indexOf(pending);
+        if (idx !== -1) resolvePendingConfirm(idx, true);
+      }, 10000);
+      roast.pendingConfirms.push(pending);
+
+      if (onGridMark){
+        // 跟30秒的嗶聲同一秒：等嗶聲播完後直接語音播報，不要再多一次嘟聲造成混淆
+        setTimeout(function(){ speak(ev.label); }, 400);
+      } else {
+        // 一般情況：先兩聲提示音播完，再接語音，避免聲音疊在一起
+        beep(720, 120, 0.55);
+        setTimeout(function(){ beep(720, 120, 0.55); }, 180);
+        setTimeout(function(){ speak(ev.label); }, 380);
+      }
     }
   });
+
+  if (hasNewConfirm) renderConfirmPanel();
 }
 
 // ---------- 事件綁定 ----------
@@ -390,6 +808,7 @@ document.addEventListener('DOMContentLoaded', function(){
     updateStartButton();
     applyRoastPlan();
   });
+  document.getElementById('sessionTemp').addEventListener('input', updateStartButton);
   document.getElementById('beanOrigin').addEventListener('input', updateStartButton);
   document.getElementById('roasterName').addEventListener('input', updateStartButton);
   document.getElementById('weightBefore').addEventListener('input', function(){
@@ -428,7 +847,7 @@ document.addEventListener('DOMContentLoaded', function(){
   // 開始烘豆
   document.getElementById('btnStartRoast').addEventListener('click', function(){
     var machineName = machineSelect.value;
-    if (!machineName || !document.getElementById('roasterName').value.trim() || !document.getElementById('beanOrigin').value.trim() || !(parseFloat(document.getElementById('weightBefore').value) > 0)) return;
+    if (!machineName || !document.getElementById('roasterName').value.trim() || !document.getElementById('beanOrigin').value.trim() || !(parseFloat(document.getElementById('weightBefore').value) > 0) || !document.getElementById('sessionTemp').value.trim()) return;
     ensureAudioCtx();
 
     roast = {
@@ -439,9 +858,14 @@ document.addEventListener('DOMContentLoaded', function(){
       elapsed: 0,
       running: true,
       lastPromptAt: 0,
-      lastWarnAt: 0,
+      lastDuduAt: 0,
       tempLog: [],
       triggeredLog: [],
+      crackEvents: [],
+      pendingCrackLabel: null,
+      pendingFinish: false,
+      firstCrackTime: null,
+      pendingConfirms: [],
       weightBefore: parseFloat(document.getElementById('weightBefore').value) || null,
       greenBean: {
         origin: document.getElementById('beanOrigin').value.trim(),
@@ -458,7 +882,6 @@ document.addEventListener('DOMContentLoaded', function(){
       session: {
         roasterName: document.getElementById('roasterName').value.trim(),
         temp: document.getElementById('sessionTemp').value.trim(),
-        humidity: document.getElementById('sessionHumidity').value.trim(),
         rpm: document.getElementById('sessionRpm').value.trim()
       },
       plan: {
@@ -473,14 +896,33 @@ document.addEventListener('DOMContentLoaded', function(){
       })
     };
 
-    document.getElementById('roastMachineName').textContent = roast.machineName;
+    document.getElementById('appbarTitle').textContent = roast.machineName + ' 烘豆控制台';
+    document.getElementById('roastMachineName').textContent = '烘豆師：' + (roast.session.roasterName || '—');
     document.getElementById('roastDate').textContent = roast.dateStr;
     document.getElementById('timerDisplay').textContent = '00:00';
-    document.getElementById('liveLog').innerHTML = '<li class="log-list__empty">尚無紀錄</li>';
     document.getElementById('rorReadout').textContent = 'RoR（升溫速率）－';
+    document.getElementById('devReadout').hidden = true;
+    document.querySelectorAll('.crack-btn').forEach(function(btn){ btn.disabled = false; });
     document.getElementById('weightAfter').value = '';
+    document.getElementById('roastLevelBean').value = '';
+    document.getElementById('roastLevelCoarse').value = '';
+    document.getElementById('roastLevelFine').value = '';
+    updateRoastLevelDiffs();
     document.getElementById('btnPauseResume').textContent = '暫停';
     hideTempPrompt();
+    hideEventConfirm();
+    hideAdjustPanel();
+
+    // 0:00 起始溫度：Mini500 用「入豆溫度」（依重量對照表帶入），其他機型用環境溫度
+    var startTemp;
+    if (machineName === 'Mini500'){
+      startTemp = parseFloat(document.getElementById('planChargeTemp').value);
+    } else {
+      startTemp = parseFloat(document.getElementById('sessionTemp').value);
+    }
+    if (!isNaN(startTemp)){
+      roast.tempLog.push({ t: 0, temp: startTemp });
+    }
 
     showScreen('roast');
     requestWakeLock();
@@ -506,7 +948,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // 手動記錄溫度
   document.getElementById('btnManualTemp').addEventListener('click', function(){
+    roast.pendingCrackLabel = null;
     showTempPrompt(false);
+  });
+
+  // 一爆起／一爆止／二爆起／二爆止
+  document.querySelectorAll('.crack-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      roast.pendingCrackLabel = btn.dataset.label;
+      showTempPrompt(false, btn.dataset.label);
+    });
   });
 
   // 溫度輸入送出
@@ -517,14 +968,85 @@ document.addEventListener('DOMContentLoaded', function(){
     if (isNaN(val)) return;
     var elapsed = roast.elapsed;
     roast.tempLog.push({ t: elapsed, temp: val });
-    addLiveLogRow(elapsed, '溫度 ' + val + '°C');
+    if (roast.pendingCrackLabel){
+      var crackLabel = roast.pendingCrackLabel;
+      roast.crackEvents.push({ t: elapsed, label: crackLabel, temp: val });
+      if (crackLabel === '一爆起' && roast.firstCrackTime == null){
+        roast.firstCrackTime = elapsed;
+        document.getElementById('devReadout').hidden = false;
+      }
+      var usedBtn = document.querySelector('.crack-btn[data-label="' + crackLabel + '"]');
+      if (usedBtn) usedBtn.disabled = true;
+      roast.pendingCrackLabel = null;
+    }
     hideTempPrompt();
-    drawLiveCurve();
-    updateRorReadout();
+    if (roast.pendingFinish){
+      roast.pendingFinish = false;
+      finishRoast();
+    } else {
+      drawLiveCurve();
+      updateRorReadout();
+    }
   });
 
-  // 結束烘豆
-  document.getElementById('btnFinishRoast').addEventListener('click', function(){
+  // 風力／火力提醒確認：按確認才寫入紀錄，按取消則不寫入；同時到時間的提醒會各自獨立列出
+  document.getElementById('eventConfirmList').addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    resolvePendingConfirm(parseInt(btn.dataset.idx, 10), btn.dataset.action === 'confirm');
+  });
+
+  // 更改風力／更改火力：烘豆過程中彈性調整烘焙計劃的數值，輸入框限 1-9，預設帶入目前數值，可用 -/+ 按鈕調整
+  var adjustType = null;
+  function openAdjustPanel(type, label){
+    adjustType = type;
+    document.getElementById('adjustPanelLabel').textContent = label + '（1-9）';
+    document.getElementById('adjustPanelValue').value = String(getCurrentAdjustValue(type));
+    var panel = document.getElementById('adjustPanel');
+    panel.hidden = false;
+    panel.classList.add('capture-panel--active');
+  }
+  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風力', '更改風力'); });
+  document.getElementById('btnChangePower').addEventListener('click', function(){ openAdjustPanel('火力', '更改火力'); });
+
+  document.getElementById('adjustPanelValue').addEventListener('input', function(){
+    var el = document.getElementById('adjustPanelValue');
+    var digits = el.value.replace(/[^1-9]/g, '');
+    el.value = digits.slice(-1);
+  });
+
+  document.getElementById('adjustPanelMinus').addEventListener('click', function(){
+    var el = document.getElementById('adjustPanelValue');
+    el.value = String(clampAdjustValue((parseInt(el.value, 10) || 5) - 1));
+  });
+  document.getElementById('adjustPanelPlus').addEventListener('click', function(){
+    var el = document.getElementById('adjustPanelValue');
+    el.value = String(clampAdjustValue((parseInt(el.value, 10) || 5) + 1));
+  });
+
+  document.getElementById('btnAdjustCancel').addEventListener('click', function(){
+    adjustType = null;
+    hideAdjustPanel();
+  });
+
+  document.getElementById('btnAdjustSubmit').addEventListener('click', function(){
+    if (!roast || !adjustType) return;
+    var val = clampAdjustValue(document.getElementById('adjustPanelValue').value);
+    var elapsed = roast.elapsed;
+    var nearestTemp = findNearestTemp(roast.tempLog, elapsed);
+    roast.triggeredLog.push({ t: elapsed, label: adjustType + ' ' + val, temp: nearestTemp });
+    adjustType = null;
+    hideAdjustPanel();
+    drawLiveCurve();
+  });
+
+  // 烘焙度（豆／粗粉／細粉）：即時計算粗粉差、細粉差
+  ['roastLevelBean', 'roastLevelCoarse', 'roastLevelFine'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', updateRoastLevelDiffs);
+  });
+
+  // 結束烘豆：先跳出溫度輸入框，送出後才真正結束
+  function finishRoast(){
     clearInterval(timerInterval);
     roast.running = false;
     releaseWakeLock();
@@ -532,16 +1054,19 @@ document.addEventListener('DOMContentLoaded', function(){
     document.getElementById('resultMachineName').textContent = roast.machineName;
     document.getElementById('resultMeta').textContent = roast.dateStr + ' · 總時間 ' + formatTime(roast.elapsed);
     renderSummary();
-
-    var body = document.getElementById('eventTableBody');
-    var sorted = roast.triggeredLog.slice().sort(function(a,b){ return a.t - b.t; });
-    body.innerHTML = sorted.length ? sorted.map(function(ev){
-      return '<tr><td>' + formatTime(ev.t) + '</td><td>' + escapeHtml(ev.label) + '</td><td>' + (ev.temp != null ? ev.temp + '°C' : '—') + '</td></tr>';
-    }).join('') : '<tr><td colspan="3" class="event-table__empty">尚無事件紀錄</td></tr>';
+    renderBeanInfoTable('resultBeanInfoBody');
+    renderLogTable('logTableBody');
 
     showScreen('result');
     drawResultCurve();
-  });
+  }
+  function requestFinishRoast(){
+    roast.pendingCrackLabel = '結束烘豆';
+    roast.pendingFinish = true;
+    showTempPrompt(false, '結束烘豆');
+  }
+  document.getElementById('btnFinishRoast').addEventListener('click', requestFinishRoast);
+  document.getElementById('btnEndRoastQuick').addEventListener('click', requestFinishRoast);
 
   // 輸入烘後重量時即時重算失重
   document.getElementById('weightAfter').addEventListener('input', function(){
@@ -551,22 +1076,127 @@ document.addEventListener('DOMContentLoaded', function(){
   // 開始新的烘焙
   document.getElementById('btnNewRoast').addEventListener('click', function(){
     roast = null;
+    document.getElementById('appbarTitle').textContent = '烘焙控制台';
     showScreen('setup');
   });
+
+  // 列印烘焙紀錄
+  document.getElementById('btnPrintRoast').addEventListener('click', function(){
+    window.print();
+  });
+
+  // 橫向事件時間軸表格（與畫面上「事件時間軸」表格版面一致）：時間為欄，各項目為列
+  function buildExportTableRows(cols){
+    var crackTimes = (roast.crackEvents || []).map(function(e){ return e.t; });
+    function isCrackCol(t){ return crackTimes.indexOf(t) !== -1; }
+    var rowDefs = [
+      { label: '時間', cells: cols.map(function(p){ return { text: formatTime(p.t), crack: isCrackCol(p.t) }; }) },
+      { label: '溫度', cells: cols.map(function(p){ return { text: String(p.temp), crack: isCrackCol(p.t), style: 'temp' }; }) },
+      { label: '30"', cells: cols.map(function(p, i){
+          if (i === 0 || isCrackCol(p.t)) return { text: '', crack: isCrackCol(p.t) };
+          return { text: String(Math.round(p.temp - cols[i - 1].temp)), crack: false, style: 'ror' };
+        }) },
+      { label: '60"', cells: (function(){
+          var row60 = compute60sRow(cols, isCrackCol);
+          return cols.map(function(p, i){
+            var v = row60[i];
+            if (v == null) return { text: '', crack: isCrackCol(p.t) };
+            return { text: String(v), crack: false, style: 'ror' };
+          });
+        })() },
+      { label: '事件', cells: cols.map(function(p){
+          var ev = (roast.crackEvents || []).find(function(e){ return e.t === p.t; });
+          return { text: ev ? ev.label : '', crack: !!ev, style: ev ? 'event' : null };
+        }) },
+      { label: '風速', cells: cols.map(function(p){
+          return { text: findNearestEventForColumn(roast.triggeredLog, '風力', p.t, 20), crack: isCrackCol(p.t) };
+        }) },
+      { label: '火力', cells: cols.map(function(p){
+          return { text: findNearestEventForColumn(roast.triggeredLog, '火力', p.t, 20), crack: isCrackCol(p.t) };
+        }) }
+    ];
+    return rowDefs;
+  }
+
+  function drawExportLogTable(ctx, x0, y0, cols){
+    var labelColW = 58;
+    var colW = 52;
+    var rowH = 30;
+    var rowDefs = buildExportTableRows(cols);
+    var tableW = labelColW + cols.length * colW;
+    var tableH = rowDefs.length * rowH;
+
+    // 表格底板（淺色，與畫面上的表格一致）
+    ctx.fillStyle = '#F3E9D8';
+    ctx.fillRect(x0, y0, tableW, tableH);
+
+    rowDefs.forEach(function(row, ri){
+      var ry = y0 + ri * rowH;
+
+      // 標題欄（第一欄，列名稱）
+      ctx.fillStyle = '#E8D9BE';
+      ctx.fillRect(x0, ry, labelColW, rowH);
+      ctx.fillStyle = '#2A211B';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(row.label, x0 + 8, ry + rowH / 2 + 4);
+
+      row.cells.forEach(function(cell, ci){
+        var cx = x0 + labelColW + ci * colW;
+        if (cell.style === 'event'){
+          ctx.fillStyle = 'rgba(139,58,43,0.22)';
+          ctx.fillRect(cx, ry, colW, rowH);
+        } else if (cell.crack){
+          ctx.fillStyle = 'rgba(139,58,43,0.10)';
+          ctx.fillRect(cx, ry, colW, rowH);
+        }
+        if (cell.text){
+          ctx.textAlign = 'center';
+          if (cell.style === 'temp'){
+            ctx.fillStyle = '#96521F'; ctx.font = 'bold 11px monospace';
+          } else if (cell.style === 'ror'){
+            ctx.fillStyle = '#8B3A2B'; ctx.font = '11px monospace';
+          } else if (cell.style === 'event'){
+            ctx.fillStyle = '#8B3A2B'; ctx.font = 'bold 10px sans-serif';
+          } else {
+            ctx.fillStyle = '#2A211B'; ctx.font = '11px monospace';
+          }
+          ctx.fillText(cell.text, cx + colW / 2, ry + rowH / 2 + 4);
+        }
+      });
+    });
+
+    // 格線
+    ctx.strokeStyle = '#C9B693';
+    ctx.lineWidth = 1;
+    for (var r = 0; r <= rowDefs.length; r++){
+      var ly = y0 + r * rowH;
+      ctx.beginPath(); ctx.moveTo(x0, ly); ctx.lineTo(x0 + tableW, ly); ctx.stroke();
+    }
+    for (var c = 0; c <= cols.length; c++){
+      var lx = x0 + labelColW + c * colW;
+      ctx.beginPath(); ctx.moveTo(lx, y0); ctx.lineTo(lx, y0 + tableH); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(x0 + labelColW, y0); ctx.lineTo(x0 + labelColW, y0 + tableH); ctx.stroke();
+    ctx.strokeRect(x0, y0, tableW, tableH);
+
+    return { width: tableW, height: tableH };
+  }
 
   // 匯出 JPG
   document.getElementById('btnExportJpg').addEventListener('click', function(){
     if (!roast) return;
     var summary = computeSummary();
-    var w = 900;
-    var headerH = 118;
-    var chartH = 340;
-    var rowH = 32;
-    var tableHeaderH = 40;
-    var sorted = roast.triggeredLog.slice().sort(function(a,b){ return a.t - b.t; });
-    var rows = Math.max(sorted.length, 1);
-    var tableH = tableHeaderH + rows * rowH + 16;
-    var totalH = headerH + chartH + tableH + 50;
+    var cols = roast.tempLog.slice().sort(function(a, b){ return a.t - b.t; });
+    var labelColW = 58, colW = 52;
+    var tableW = labelColW + Math.max(cols.length, 1) * colW;
+    var w = Math.max(900, tableW + 48);
+    var headerH = 144;
+    var stepBandH = hasFanPowerEvents(roast.triggeredLog) ? 130 : 0;
+    var chartH = 340 + stepBandH + (stepBandH > 0 ? 22 : 0);
+    var tableTitleH = 34;
+    var tableH = Math.max(cols.length ? 7 * 30 : 30, 30);
+    var totalH = headerH + chartH + tableTitleH + tableH + 50;
 
     var canvas = document.createElement('canvas');
     canvas.width = w;
@@ -576,47 +1206,70 @@ document.addEventListener('DOMContentLoaded', function(){
     ctx.fillStyle = '#241712';
     ctx.fillRect(0, 0, w, totalH);
 
+    var gb = roast.greenBean || {};
+    var beanParts = [gb.origin, gb.farm, gb.process].filter(function(v){ return v; });
+    var line1Text = (beanParts.length ? beanParts.join(' · ') + ' ' : '') + '烘焙紀錄';
+    var line2Text = roast.machineName + '　烘豆師：' + ((roast.session && roast.session.roasterName) || '—') + '　' + roast.dateStr;
+    var line3Text = '總時間 ' + formatTime(roast.elapsed) + '　DTR ' + summary.dtrText + '　總升溫 ' + summary.riseText + '　失重 ' + summary.lossText;
+    var weightAfterVal = document.getElementById('weightAfter').value;
+    var levelBean = document.getElementById('roastLevelBean').value;
+    var levelCoarse = document.getElementById('roastLevelCoarse').value;
+    var levelFine = document.getElementById('roastLevelFine').value;
+    var levelBeanNum = parseFloat(levelBean);
+    var diffCoarseVal = (!isNaN(levelBeanNum) && levelCoarse !== '' && !isNaN(parseFloat(levelCoarse))) ? (levelBeanNum - parseFloat(levelCoarse)).toFixed(1) : null;
+    var diffFineVal = (!isNaN(levelBeanNum) && levelFine !== '' && !isNaN(parseFloat(levelFine))) ? (levelBeanNum - parseFloat(levelFine)).toFixed(1) : null;
+
+    // 依序畫出多段不同顏色的文字，回傳畫完後的 x 座標
+    function drawTextSegments(segments, x, y){
+      segments.forEach(function(seg){
+        ctx.fillStyle = seg.color;
+        ctx.font = seg.font || '13px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(seg.text, x, y);
+        x += ctx.measureText(seg.text).width;
+      });
+      return x;
+    }
+
     ctx.fillStyle = '#F3E9D8';
-    ctx.font = 'bold 24px sans-serif';
+    ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(roast.machineName, 24, 40);
+    ctx.fillText(line1Text, 24, 34);
     ctx.fillStyle = '#D9C6A3';
     ctx.font = '14px sans-serif';
-    ctx.fillText(roast.dateStr + ' · 總時間 ' + formatTime(roast.elapsed), 24, 66);
+    ctx.fillText(line2Text, 24, 58);
     ctx.fillStyle = '#BD6B2E';
     ctx.font = '13px monospace';
-    ctx.fillText('DTR ' + summary.dtrText + '　總升溫 ' + summary.riseText + '　失重 ' + summary.lossText, 24, 92);
+    ctx.fillText(line3Text, 24, 82);
 
-    renderChart(ctx, 24, headerH, w - 48, chartH - 20, roast.tempLog, roast.triggeredLog);
+    drawTextSegments([
+      { text: '烘後重量 ' + (weightAfterVal || '—') + 'g　', color: '#D9C6A3' },
+      { text: '烘焙度(豆) ' + (levelBean || '—') + '　', color: '#D9C6A3' },
+      { text: '烘焙度(粗粉) ' + (levelCoarse || '—') + ' ', color: '#D9C6A3' },
+      { text: '(粗粉差 ' + (diffCoarseVal != null ? diffCoarseVal : '—') + ')　', color: '#8B3A2B' },
+      { text: '烘焙度(細粉) ' + (levelFine || '—') + ' ', color: '#D9C6A3' },
+      { text: '(細粉差 ' + (diffFineVal != null ? diffFineVal : '—') + ')', color: '#8B3A2B' }
+    ], 24, 106);
 
-    var y = headerH + chartH + 16;
+    renderChart(ctx, 24, headerH, w - 48, chartH - 20, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents);
+
+    var tableY = headerH + chartH + tableTitleH;
     ctx.fillStyle = '#BD6B2E';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('時間', 24, y);
-    ctx.fillText('事件', 140, y);
-    ctx.fillText('溫度', 420, y);
-    y += 10;
-    ctx.strokeStyle = 'rgba(243,232,211,0.2)';
-    ctx.beginPath(); ctx.moveTo(24, y); ctx.lineTo(w - 24, y); ctx.stroke();
-    y += 26;
+    ctx.textAlign = 'left';
+    ctx.fillText('事件時間軸', 24, tableY - 12);
 
-    ctx.font = '14px monospace';
-    if (sorted.length === 0){
+    if (cols.length === 0){
       ctx.fillStyle = '#c9b693';
-      ctx.fillText('尚無事件紀錄', 24, y);
+      ctx.font = '14px sans-serif';
+      ctx.fillText('尚無溫度紀錄', 24, tableY + 20);
     } else {
-      sorted.forEach(function(ev){
-        ctx.fillStyle = '#BD6B2E';
-        ctx.fillText(formatTime(ev.t), 24, y);
-        ctx.fillStyle = '#F3E9D8';
-        ctx.fillText(ev.label, 140, y);
-        ctx.fillText(ev.temp != null ? ev.temp + '°C' : '—', 420, y);
-        y += rowH;
-      });
+      drawExportLogTable(ctx, 24, tableY, cols);
     }
 
     ctx.fillStyle = '#c9b693';
     ctx.font = '12px sans-serif';
+    ctx.textAlign = 'left';
     ctx.fillText('由烘焙控制台匯出', 24, totalH - 16);
 
     canvas.toBlob(function(blob){

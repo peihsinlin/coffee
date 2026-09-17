@@ -88,6 +88,12 @@ function applyRoastPlan(){
 // iPhone（iOS Safari）在背景或閒置一段時間後會把 AudioContext 自動 suspend，
 // resume() 又是非同步的：如果沒等 resume 完成就排音效，聲音會直接消失不會播放，
 // 這是「風力／火力沒有聲音提醒」的主因，因此這裡改成等 resume 完成後才真正播放。
+// 判斷是否為 iPhone／iPad（iPadOS 13+ 會偽裝成 MacIntel，用觸控點數輔助判斷）
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function ensureAudioCtx(){
   if (!audioCtx){
     var AC = window.AudioContext || window.webkitAudioContext;
@@ -120,30 +126,56 @@ function beep(freq, duration, volume){
     playNow();
   }
 }
+// 快取語音清單：iOS 上 getVoices() 一開始可能是空的，要等 voiceschanged 事件才拿得到完整清單，
+// 沒快取、每次 speak() 才呼叫 getVoices() 容易在清單還沒載入時選到錯的語音（或選到英文語音）
+var cachedVoices = [];
+function refreshVoiceCache(){
+  if ('speechSynthesis' in window){
+    cachedVoices = window.speechSynthesis.getVoices() || [];
+  }
+}
+if ('speechSynthesis' in window){
+  refreshVoiceCache();
+  window.speechSynthesis.onvoiceschanged = refreshVoiceCache;
+}
+// 優先選完全符合 zh-TW 的語音（Android／iPhone 上這通常都是同一套女聲），
+// 找不到才退而求其次找 zh-CN、再退而求其次找任何 zh 語音，避免選到 iPhone 上另一個腔調不同的語音
+function pickZhVoice(){
+  var voices = cachedVoices.length ? cachedVoices : (('speechSynthesis' in window) ? window.speechSynthesis.getVoices() : []);
+  if (!voices || !voices.length) return null;
+  return voices.find(function(v){ return v.lang === 'zh-TW'; }) ||
+    voices.find(function(v){ return /^zh-TW/i.test(v.lang); }) ||
+    voices.find(function(v){ return /^zh-CN/i.test(v.lang); }) ||
+    voices.find(function(v){ return /^zh/i.test(v.lang); }) ||
+    null;
+}
 function speak(text){
   if (!('speechSynthesis' in window)) return;
-  // iOS 的語音佇列偶爾會卡住，先清空再播放新的一句，避免後面提醒完全發不出聲音
-  try { window.speechSynthesis.cancel(); } catch (e){}
+  // 注意：這裡刻意不在播放前呼叫 cancel()。Web Speech API 本身就會把多個 speak() 依序排隊播放，
+  // 若在風力、火力同時觸發、幾乎同時呼叫 speak() 時貿然 cancel()，會把前一句正在播放或剛要開始的
+  // 語音打斷／清掉，這正是「風力聲音不見」「第一個字被蓋住」的成因，改成不主動 cancel、讓它們照順序播完。
   var u = new SpeechSynthesisUtterance(text);
-  var voices = window.speechSynthesis.getVoices();
-  var zh = voices.find(function(v){ return /zh/i.test(v.lang); });
+  var zh = pickZhVoice();
   if (zh) { u.voice = zh; u.lang = zh.lang; } else { u.lang = 'zh-TW'; }
   u.rate = 1;
   window.speechSynthesis.speak(u);
 }
 // iOS 的語音合成（speechSynthesis）跟 AudioContext 是兩套各自獨立的「解鎖」機制：
 // AudioContext 解鎖了，不代表 speechSynthesis 之後也能在計時器（非使用者操作）裡正常發聲，
-// 一定要先在使用者手勢（點擊）當下實際呼叫過一次 speak()，之後計時器觸發的語音才會真的有聲音，
-// 這極可能就是「風力／火力語音提醒」在 iPhone 上沒有聲音的主因。
+// 一定要先在使用者手勢（點擊）當下實際呼叫過一次 speak()，之後計時器觸發的語音才會真的有聲音。
+// 只需要解鎖一次即可，之後不再重複呼叫，避免多次插入近乎無聲的語音打亂正常提醒的播放順序。
+var speechPrimed = false;
 function primeSpeech(){
+  if (speechPrimed) return;
   if (!('speechSynthesis' in window)) return;
   try {
     var u = new SpeechSynthesisUtterance(' ');
     u.volume = 0.01;
     window.speechSynthesis.speak(u);
+    speechPrimed = true;
   } catch (e){}
 }
-// 烘豆過程中，每次點擊畫面上的按鈕都順便嘗試解鎖／喚醒音效與語音，
+// 烘豆過程中，點擊畫面上的按鈕時嘗試解鎖／喚醒音效與語音（語音只會實際解鎖一次），
 // 增加 iPhone 在螢幕鎖定、切換App或音訊被系統中斷後恢復正常提醒音的機會
 document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('screen-roast').addEventListener('click', function(){
@@ -295,18 +327,31 @@ function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
   ctx.fillStyle = '#BD6B2E'; ctx.fillText('P 火力', x0 + 44, yTop - 2);
 }
 
-function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackEvents){
+// 圖表配色主題：dark 是原本畫面／JPG匯出用的深色版，light 是白底版（供列印使用）
+var CHART_THEMES = {
+  dark: {
+    bg: '#241712', border: 'rgba(243,232,211,0.14)', gridLine: 'rgba(243,232,211,0.08)',
+    axisText: '#c9b693', labelText: '#F3E9D8', legendText: '#F3E9D8', placeholderText: '#c9b693'
+  },
+  light: {
+    bg: '#ffffff', border: 'rgba(42,33,27,0.20)', gridLine: 'rgba(42,33,27,0.12)',
+    axisText: '#6B5D4F', labelText: '#2A211B', legendText: '#2A211B', placeholderText: '#8a7a68'
+  }
+};
+
+function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackEvents, theme){
+  var th = CHART_THEMES[theme] || CHART_THEMES.dark;
   stepBandH = stepBandH || 0;
   var stepGap = stepBandH > 0 ? 22 : 0;
 
-  ctx.fillStyle = '#241712';
+  ctx.fillStyle = th.bg;
   ctx.fillRect(x0, y0, w, h);
-  ctx.strokeStyle = 'rgba(243,232,211,0.14)';
+  ctx.strokeStyle = th.border;
   ctx.lineWidth = 1;
   ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
 
   if (tempLog.length === 0){
-    ctx.fillStyle = '#c9b693';
+    ctx.fillStyle = th.placeholderText;
     ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('尚無溫度紀錄', x0 + w / 2, y0 + h / 2);
@@ -328,8 +373,8 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   function yScale(temp){ return y0 + padT + (1 - (temp - minTemp) / (maxTemp - minTemp)) * plotH; }
 
   // 溫度格線（左軸）
-  ctx.strokeStyle = 'rgba(243,232,211,0.08)';
-  ctx.fillStyle = '#c9b693';
+  ctx.strokeStyle = th.gridLine;
+  ctx.fillStyle = th.axisText;
   ctx.font = '10px monospace';
   ctx.textAlign = 'right';
   var step = 50;
@@ -427,7 +472,7 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(labelX, (line1Y + line2Y) / 2); ctx.stroke();
 
     // 第一行：事件名稱＋時間
-    ctx.fillStyle = '#F3E9D8';
+    ctx.fillStyle = th.labelText;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(ev.label + ' ' + formatTime(ev.t), textX, line1Y);
@@ -442,13 +487,13 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   ctx.textAlign = 'left';
   ctx.strokeStyle = '#5B6B3E'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(x0 + padL + 4, y0 + 14); ctx.lineTo(x0 + padL + 18, y0 + 14); ctx.stroke();
-  ctx.fillStyle = '#F3E9D8'; ctx.fillText('BT', x0 + padL + 22, y0 + 17);
+  ctx.fillStyle = th.legendText; ctx.fillText('BT', x0 + padL + 22, y0 + 17);
   ctx.strokeStyle = '#8B3A2B'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x0 + padL + 4, y0 + 28); ctx.lineTo(x0 + padL + 18, y0 + 28); ctx.stroke();
-  ctx.fillStyle = '#F3E9D8'; ctx.fillText('RoR', x0 + padL + 22, y0 + 31);
+  ctx.fillStyle = th.legendText; ctx.fillText('RoR', x0 + padL + 22, y0 + 31);
 
   // 時間刻度
-  ctx.fillStyle = '#c9b693';
+  ctx.fillStyle = th.axisText;
   ctx.font = '10px monospace';
   ctx.textAlign = 'center';
   var xStep = maxT > 600 ? 120 : 60;
@@ -459,7 +504,7 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   // 風力／火力階梯圖（僅在有這類事件時顯示），跟上方圖表隔開一段距離
   if (stepBandH > 0){
     var stepTop = y0 + mainH + stepGap;
-    ctx.strokeStyle = 'rgba(243,232,211,0.14)';
+    ctx.strokeStyle = th.border;
     ctx.beginPath(); ctx.moveTo(x0, stepTop - stepGap / 2); ctx.lineTo(x0 + w, stepTop - stepGap / 2); ctx.stroke();
     var fanItems = triggeredLog.filter(function(ev){ return ev.label.indexOf('風力') === 0; })
       .map(function(ev){ return { t: ev.t, value: ev.label.replace('風力 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
@@ -838,7 +883,10 @@ function tick(){
       }, 10000);
       roast.pendingConfirms.push(pending);
 
-      if (onGridMark){
+      if (ev.seconds === 0){
+        // 烘豆一開始（0:00）就設定好的風力／火力，屬於起始設定而非中途提醒，
+        // 不需要嗶聲或語音打斷剛開始烘豆的當下，只留確認清單讓使用者確認寫入即可
+      } else if (onGridMark){
         // 跟30秒的嗶聲同一秒：等嗶聲播完後直接語音播報，不要再多一次嘟聲造成混淆
         setTimeout(function(){ speak(ev.label); }, 400);
       } else {
@@ -1158,9 +1206,13 @@ document.addEventListener('DOMContentLoaded', function(){
     showScreen('setup');
   });
 
-  // 列印烘焙紀錄
+  // 列印烘焙紀錄：改成跟 JPG 匯出相同版面內容的白底版本，取代直接列印畫面上的深色面板
   document.getElementById('btnPrintRoast').addEventListener('click', function(){
-    window.print();
+    if (!roast) return;
+    var canvas = buildRoastCanvas('light');
+    var img = document.getElementById('printExportImage');
+    img.onload = function(){ window.print(); };
+    img.src = canvas.toDataURL('image/jpeg', 0.95);
   });
 
   // 橫向事件時間軸表格（與畫面上「事件時間軸」表格版面一致）：時間為欄，各項目為列
@@ -1319,8 +1371,18 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   // 匯出 JPG
-  document.getElementById('btnExportJpg').addEventListener('click', function(){
-    if (!roast) return;
+  // 建立烘焙紀錄的完整版面（頁首文字、圖表、生豆資訊表、事件時間軸表）到一個 canvas，
+  // theme 為 'dark'（預設，跟畫面一致，供 JPG 匯出使用）或 'light'（白底，供列印使用）
+  function buildRoastCanvas(theme){
+    theme = theme || 'dark';
+    var palette = (theme === 'light') ? {
+      pageBg: '#ffffff', title: '#2A211B', subtitle: '#6B5D4F', meta: '#96521F',
+      stat: '#4A3F35', diff: '#8B3A2B', sectionTitle: '#96521F', footer: '#8a7a68', placeholder: '#8a7a68'
+    } : {
+      pageBg: '#241712', title: '#F3E9D8', subtitle: '#D9C6A3', meta: '#BD6B2E',
+      stat: '#D9C6A3', diff: '#8B3A2B', sectionTitle: '#BD6B2E', footer: '#c9b693', placeholder: '#c9b693'
+    };
+
     var summary = computeSummary();
     var cols = roast.tempLog.slice().sort(function(a, b){ return a.t - b.t; });
     var labelColW = 58, colW = 52;
@@ -1340,7 +1402,7 @@ document.addEventListener('DOMContentLoaded', function(){
     canvas.height = totalH;
     var ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#241712';
+    ctx.fillStyle = palette.pageBg;
     ctx.fillRect(0, 0, w, totalH);
 
     var gb = roast.greenBean || {};
@@ -1368,62 +1430,70 @@ document.addEventListener('DOMContentLoaded', function(){
       return x;
     }
 
-    ctx.fillStyle = '#F3E9D8';
+    ctx.fillStyle = palette.title;
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(line1Text, 24, 34);
-    ctx.fillStyle = '#D9C6A3';
+    ctx.fillStyle = palette.subtitle;
     ctx.font = '14px sans-serif';
     ctx.fillText(line2Text, 24, 58);
-    ctx.fillStyle = '#BD6B2E';
+    ctx.fillStyle = palette.meta;
     ctx.font = '13px monospace';
     ctx.fillText(line3Text, 24, 82);
 
     drawTextSegments([
-      { text: '烘後重量 ' + (weightAfterVal || '—') + 'g　', color: '#D9C6A3' },
-      { text: '烘焙度(豆) ' + (levelBean || '—') + '　', color: '#D9C6A3' },
-      { text: '烘焙度(粗粉) ' + (levelCoarse || '—') + ' ', color: '#D9C6A3' },
-      { text: '(粗粉差 ' + (diffCoarseVal != null ? diffCoarseVal : '—') + ')　', color: '#8B3A2B' },
-      { text: '烘焙度(細粉) ' + (levelFine || '—') + ' ', color: '#D9C6A3' },
-      { text: '(細粉差 ' + (diffFineVal != null ? diffFineVal : '—') + ')', color: '#8B3A2B' }
+      { text: '烘後重量 ' + (weightAfterVal || '—') + 'g　', color: palette.stat },
+      { text: '烘焙度(豆) ' + (levelBean || '—') + '　', color: palette.stat },
+      { text: '烘焙度(粗粉) ' + (levelCoarse || '—') + ' ', color: palette.stat },
+      { text: '(粗粉差 ' + (diffCoarseVal != null ? diffCoarseVal : '—') + ')　', color: palette.diff },
+      { text: '烘焙度(細粉) ' + (levelFine || '—') + ' ', color: palette.stat },
+      { text: '(細粉差 ' + (diffFineVal != null ? diffFineVal : '—') + ')', color: palette.diff }
     ], 24, 106);
 
-    renderChart(ctx, 24, headerH, w - 48, chartH - 20, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents);
+    renderChart(ctx, 24, headerH, w - 48, chartH - 20, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, theme);
 
     var beanY = headerH + chartH + beanTitleH;
-    ctx.fillStyle = '#BD6B2E';
+    ctx.fillStyle = palette.sectionTitle;
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('生豆資訊', 24, beanY - 12);
     drawExportBeanInfoTable(ctx, 24, beanY, w - 48);
 
     var tableY = beanY + beanTableH + tableTitleH;
-    ctx.fillStyle = '#BD6B2E';
+    ctx.fillStyle = palette.sectionTitle;
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('事件時間軸', 24, tableY - 12);
 
     if (cols.length === 0){
-      ctx.fillStyle = '#c9b693';
+      ctx.fillStyle = palette.placeholder;
       ctx.font = '14px sans-serif';
       ctx.fillText('尚無溫度紀錄', 24, tableY + 20);
     } else {
       drawExportLogTable(ctx, 24, tableY, cols);
     }
 
-    ctx.fillStyle = '#c9b693';
+    ctx.fillStyle = palette.footer;
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('由烘焙控制台匯出', 24, totalH - 16);
+
+    return canvas;
+  }
+
+  document.getElementById('btnExportJpg').addEventListener('click', function(){
+    if (!roast) return;
+    var canvas = buildRoastCanvas('dark');
 
     canvas.toBlob(function(blob){
       var dateStr = new Date().toISOString().slice(0, 10);
       var filename = 'roast-' + dateStr + '.jpg';
 
-      // iPhone（iOS Safari）不支援 <a download> 直接存檔，只會開新分頁；
-      // 支援 Web Share API 時改用系統分享面板，可以直接「儲存影像」到相簿
+      // iPhone（iOS Safari）不支援 <a download> 直接存檔，只會開新分頁，改用 Web Share API
+      // 讓使用者直接「儲存影像」到相簿；Android 的 canShare 也可能回傳 true，但那邊原本的
+      // <a download> 就能直接存檔，所以只在 iOS 上才走分享面板，其餘（Android／桌機）都維持原本的直接下載
       var file = (typeof File !== 'undefined') ? new File([blob], filename, { type: 'image/jpeg' }) : null;
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })){
+      if (isIOS() && file && navigator.canShare && navigator.canShare({ files: [file] })){
         navigator.share({ files: [file], title: filename }).catch(function(){});
         return;
       }

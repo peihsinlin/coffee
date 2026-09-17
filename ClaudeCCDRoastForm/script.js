@@ -85,29 +85,45 @@ function applyRoastPlan(){
 }
 
 // ---------- 音效與語音 ----------
+// iPhone（iOS Safari）在背景或閒置一段時間後會把 AudioContext 自動 suspend，
+// resume() 又是非同步的：如果沒等 resume 完成就排音效，聲音會直接消失不會播放，
+// 這是「風力／火力沒有聲音提醒」的主因，因此這裡改成等 resume 完成後才真正播放。
 function ensureAudioCtx(){
   if (!audioCtx){
     var AC = window.AudioContext || window.webkitAudioContext;
     if (AC) audioCtx = new AC();
   }
-  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
+}
+function resumeAudioCtx(){
+  if (audioCtx && audioCtx.state === 'suspended'){
+    audioCtx.resume().catch(function(){});
+  }
 }
 function beep(freq, duration, volume){
   var ctx = ensureAudioCtx();
   if (!ctx) return;
-  var osc = ctx.createOscillator();
-  var gain = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = freq;
-  gain.gain.value = (volume != null) ? volume : 0.45;
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + duration / 1000);
+  function playNow(){
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = (volume != null) ? volume : 0.45;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration / 1000);
+  }
+  if (ctx.state === 'suspended'){
+    ctx.resume().then(playNow).catch(function(){});
+  } else {
+    playNow();
+  }
 }
 function speak(text){
   if (!('speechSynthesis' in window)) return;
+  // iOS 的語音佇列偶爾會卡住，先清空再播放新的一句，避免後面提醒完全發不出聲音
+  try { window.speechSynthesis.cancel(); } catch (e){}
   var u = new SpeechSynthesisUtterance(text);
   var voices = window.speechSynthesis.getVoices();
   var zh = voices.find(function(v){ return /zh/i.test(v.lang); });
@@ -126,7 +142,10 @@ function releaseWakeLock(){
   if (wakeLock){ wakeLock.release().catch(function(){}); wakeLock = null; }
 }
 document.addEventListener('visibilitychange', function(){
-  if (document.visibilityState === 'visible' && roast && roast.running) requestWakeLock();
+  if (document.visibilityState === 'visible' && roast && roast.running){
+    requestWakeLock();
+    resumeAudioCtx();
+  }
 });
 
 // ---------- 畫面切換 ----------
@@ -614,6 +633,18 @@ function findNearestEventForColumn(triggeredLog, prefix, targetT, tolerance){
   return best ? best.label.replace(prefix + ' ', '') : '';
 }
 
+// 計算「30秒升溫」列：當格溫度減「往回最近一個非事件欄位」的溫度，跳過事件（爆點）欄位當基準，
+// 避免像 07:03 這種下一格緊接在事件欄位（如一爆起）之後時，誤用事件當下的溫度當作起點算出錯誤（甚至變 0）的結果
+function compute30sRow(cols, isCrackCol){
+  return cols.map(function(p, i){
+    if (isCrackCol(p.t)) return null;
+    var prevIdx = i - 1;
+    while (prevIdx >= 0 && isCrackCol(cols[prevIdx].t)) prevIdx--;
+    if (prevIdx < 0) return null;
+    return Math.round(p.temp - cols[prevIdx].temp);
+  });
+}
+
 // 計算「60秒升溫」列該顯示在哪些欄位、以及對應的溫度差
 // 由於溫度紀錄的實際時間點會因手動送出延遲而偏離整30秒格（累積後可能偏離超過原本±5秒的容許值），
 // 改用「找出離每個整分鐘標記最近的欄位」來決定顯示欄位，並動態往回找最接近60秒前的溫度點來計算溫度差，
@@ -675,9 +706,10 @@ function renderLogTable(targetId){
     return '<td' + tdClass('lt-temp', p.t) + '>' + p.temp + '</td>';
   }).join('') + '</tr>';
 
+  var row30 = compute30sRow(cols, isCrackCol);
   rows += '<tr><th>30&quot;</th>' + cols.map(function(p, i){
-    if (i === 0 || isCrackCol(p.t)) return '<td' + tdClass(null, p.t) + '></td>';
-    var v = Math.round(p.temp - cols[i - 1].temp);
+    var v = row30[i];
+    if (v == null) return '<td' + tdClass(null, p.t) + '></td>';
     return '<td' + tdClass('lt-ror', p.t) + '>' + v + '</td>';
   }).join('') + '</tr>';
 
@@ -739,6 +771,7 @@ function updateRoastLevelDiffs(){
 // ---------- 計時器 ----------
 function tick(){
   if (!roast || !roast.running) return;
+  resumeAudioCtx(); // 每秒檢查一次，iPhone 背景／閒置後 AudioContext 被 suspend 時可以盡快恢復
   var elapsed = roast.pausedElapsed + Math.floor((Date.now() - roast.startAt) / 1000);
   roast.elapsed = elapsed;
   document.getElementById('timerDisplay').textContent = formatTime(elapsed);
@@ -1115,10 +1148,14 @@ document.addEventListener('DOMContentLoaded', function(){
     var rowDefs = [
       { label: '時間', cells: cols.map(function(p){ return { text: formatTime(p.t), crack: isCrackCol(p.t) }; }) },
       { label: '溫度', cells: cols.map(function(p){ return { text: String(p.temp), crack: isCrackCol(p.t), style: 'temp' }; }) },
-      { label: '30"', cells: cols.map(function(p, i){
-          if (i === 0 || isCrackCol(p.t)) return { text: '', crack: isCrackCol(p.t) };
-          return { text: String(Math.round(p.temp - cols[i - 1].temp)), crack: false, style: 'ror' };
-        }) },
+      { label: '30"', cells: (function(){
+          var row30 = compute30sRow(cols, isCrackCol);
+          return cols.map(function(p, i){
+            var v = row30[i];
+            if (v == null) return { text: '', crack: isCrackCol(p.t) };
+            return { text: String(v), crack: false, style: 'ror' };
+          });
+        })() },
       { label: '60"', cells: (function(){
           var row60 = compute60sRow(cols, isCrackCol);
           return cols.map(function(p, i){
@@ -1206,53 +1243,53 @@ document.addEventListener('DOMContentLoaded', function(){
     return { width: tableW, height: tableH };
   }
 
-  // 生豆資訊表格（與畫面上「生豆資訊」表格版面一致）：兩欄標籤＋數值並排
+  // 生豆資訊表格：5 欄（列）× 2 列（行），每格上方標籤、下方數值，較不佔垂直空間
   function drawExportBeanInfoTable(ctx, x0, y0, tableW){
-    var rowH = 28;
-    var labelW = 96;
-    var valueW = (tableW - labelW * 2) / 2;
+    var colCount = 5;
+    var rowH = 46;
+    var colW = tableW / colCount;
     var gb = roast.greenBean || {};
     function v(val){ return val || '—'; }
-    var rows = [
-      ['國家／地區', v(gb.origin), '莊園', v(gb.farm)],
-      ['公司', v(gb.company), '品種', v(gb.variety)],
-      ['處理法', v(gb.process), '價格／1kg', v(gb.price)],
-      ['瑕疵率(%)', v(gb.defectRate), '含水率(%)', v(gb.moisture)],
-      ['密度', v(gb.density), '備註', v(gb.notes)]
+    var cells = [
+      ['國家／地區', v(gb.origin)], ['莊園', v(gb.farm)], ['公司', v(gb.company)], ['品種', v(gb.variety)], ['處理法', v(gb.process)],
+      ['價格／1kg', v(gb.price)], ['瑕疵率(%)', v(gb.defectRate)], ['含水率(%)', v(gb.moisture)], ['密度', v(gb.density)], ['備註', v(gb.notes)]
     ];
-    var tableH = rows.length * rowH;
+    var tableH = rowH * 2;
 
     ctx.fillStyle = '#F3E9D8';
     ctx.fillRect(x0, y0, tableW, tableH);
 
-    rows.forEach(function(r, ri){
-      var ry = y0 + ri * rowH;
-      var cx = x0;
+    cells.forEach(function(cell, idx){
+      var row = Math.floor(idx / colCount);
+      var col = idx % colCount;
+      var cx = x0 + col * colW;
+      var cy = y0 + row * rowH;
       ctx.textAlign = 'left';
 
-      ctx.fillStyle = '#E8D9BE'; ctx.fillRect(cx, ry, labelW, rowH);
-      ctx.fillStyle = '#6B5D4F'; ctx.font = '11px sans-serif';
-      ctx.fillText(r[0], cx + 8, ry + rowH / 2 + 4);
-      cx += labelW;
+      ctx.fillStyle = '#6B5D4F';
+      ctx.font = '10.5px sans-serif';
+      ctx.fillText(cell[0], cx + 8, cy + 17);
 
-      ctx.fillStyle = '#2A211B'; ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(r[1], cx + 8, ry + rowH / 2 + 4);
-      cx += valueW;
-
-      ctx.fillStyle = '#E8D9BE'; ctx.fillRect(cx, ry, labelW, rowH);
-      ctx.fillStyle = '#6B5D4F'; ctx.font = '11px sans-serif';
-      ctx.fillText(r[2], cx + 8, ry + rowH / 2 + 4);
-      cx += labelW;
-
-      ctx.fillStyle = '#2A211B'; ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(r[3], cx + 8, ry + rowH / 2 + 4);
+      var valText = cell[1];
+      var maxW = colW - 16;
+      ctx.font = 'bold 12px sans-serif';
+      while (ctx.measureText(valText).width > maxW && valText.length > 1){
+        valText = valText.slice(0, -1);
+      }
+      if (valText !== cell[1]) valText += '…';
+      ctx.fillStyle = '#2A211B';
+      ctx.fillText(valText, cx + 8, cy + 35);
     });
 
     ctx.strokeStyle = '#C9B693';
     ctx.lineWidth = 1;
-    for (var i = 0; i <= rows.length; i++){
-      var ly = y0 + i * rowH;
+    for (var r = 0; r <= 2; r++){
+      var ly = y0 + r * rowH;
       ctx.beginPath(); ctx.moveTo(x0, ly); ctx.lineTo(x0 + tableW, ly); ctx.stroke();
+    }
+    for (var c = 0; c <= colCount; c++){
+      var lx = x0 + c * colW;
+      ctx.beginPath(); ctx.moveTo(lx, y0); ctx.lineTo(lx, y0 + tableH); ctx.stroke();
     }
     ctx.strokeRect(x0, y0, tableW, tableH);
 
@@ -1271,7 +1308,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var stepBandH = hasFanPowerEvents(roast.triggeredLog) ? 130 : 0;
     var chartH = 340 + stepBandH + (stepBandH > 0 ? 22 : 0);
     var beanTitleH = 34;
-    var beanTableH = 5 * 28;
+    var beanTableH = 2 * 46;
     var tableTitleH = 34;
     var tableH = Math.max(cols.length ? 7 * 30 : 30, 30);
     var totalH = headerH + chartH + beanTitleH + beanTableH + tableTitleH + tableH + 50;
@@ -1358,11 +1395,21 @@ document.addEventListener('DOMContentLoaded', function(){
     ctx.fillText('由烘焙控制台匯出', 24, totalH - 16);
 
     canvas.toBlob(function(blob){
+      var dateStr = new Date().toISOString().slice(0, 10);
+      var filename = 'roast-' + dateStr + '.jpg';
+
+      // iPhone（iOS Safari）不支援 <a download> 直接存檔，只會開新分頁；
+      // 支援 Web Share API 時改用系統分享面板，可以直接「儲存影像」到相簿
+      var file = (typeof File !== 'undefined') ? new File([blob], filename, { type: 'image/jpeg' }) : null;
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })){
+        navigator.share({ files: [file], title: filename }).catch(function(){});
+        return;
+      }
+
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      var dateStr = new Date().toISOString().slice(0, 10);
       a.href = url;
-      a.download = 'roast-' + dateStr + '.jpg';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();

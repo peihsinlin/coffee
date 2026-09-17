@@ -343,14 +343,14 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   }
 
   // 一爆／二爆事件標註：仿照斜線引出標籤，兩行文字（第一行事件名稱+時間、第二行溫度）行距緊靠、不佔太多畫面，文字都在指標左邊避免超出圖表
-  // 依時間排序後，不同事件錯開標註：第一個在下方、下一個在上方，依序交錯，避免相鄰事件重疊；
+  // 依時間排序後，不同事件錯開標註：第一個（通常是一爆起）在上方、下一個在下方，依序交錯，避免相鄰事件重疊；
   // 若同一側仍有時間太接近的事件，再逐層外推位置（往左、往外加大間距）
   var sortedEvents = (crackEvents || []).slice().sort(function(a, b){ return a.t - b.t; });
   var collisionThreshold = 65; // px，小於此距離視為時間接近
   var lastXBySide = { below: null, above: null };
   var levelBySide = { below: 0, above: 0 };
   sortedEvents.forEach(function(ev, idx){
-    var side = (idx % 2 === 0) ? 'below' : 'above';
+    var side = (idx % 2 === 0) ? 'above' : 'below';
     ev._side = side;
     var x = xScale(ev.t);
     if (lastXBySide[side] !== null && Math.abs(x - lastXBySide[side]) < collisionThreshold){
@@ -451,7 +451,7 @@ function drawResultCurve(){
 // ---------- 溫度輸入面板 ----------
 function showTempPrompt(auto, crackLabel){
   var panel = document.getElementById('tempPrompt');
-  var label = crackLabel ? ('請輸入「' + crackLabel + '」溫度') : (auto ? '請輸入目前溫度' : '手動記錄溫度');
+  var label = crackLabel ? ('請輸入「' + crackLabel + '」溫度') : (auto ? '請輸入目前溫度' : '手動記溫');
   document.getElementById('tempPromptLabel').textContent = label;
   document.getElementById('tempPromptInput').value = '';
   panel.hidden = false;
@@ -732,8 +732,8 @@ function updateRoastLevelDiffs(){
   var bean = parseFloat(document.getElementById('roastLevelBean').value);
   var coarse = parseFloat(document.getElementById('roastLevelCoarse').value);
   var fine = parseFloat(document.getElementById('roastLevelFine').value);
-  document.getElementById('diffCoarse').textContent = (!isNaN(bean) && !isNaN(coarse)) ? (bean - coarse).toFixed(1) : '—';
-  document.getElementById('diffFine').textContent = (!isNaN(bean) && !isNaN(fine)) ? (bean - fine).toFixed(1) : '—';
+  document.getElementById('diffCoarse').textContent = (!isNaN(bean) && !isNaN(coarse)) ? Math.abs(bean - coarse).toFixed(1) : '—';
+  document.getElementById('diffFine').textContent = (!isNaN(bean) && !isNaN(fine)) ? Math.abs(bean - fine).toFixed(1) : '—';
 }
 
 // ---------- 計時器 ----------
@@ -756,12 +756,18 @@ function tick(){
   }
 
   // 第30秒整的「嗶」聲，並跳出溫度輸入
+  // 若此時「手動記溫／一爆起／一爆止／二爆起／二爆止」的溫度輸入正在進行中，先不要蓋掉它，
+  // 等那筆溫度填完送出後，再補顯示這次的30秒溫度提示
   var onGridMark = (elapsed > 0 && elapsed % 30 === 0);
   if (onGridMark && roast.lastPromptAt !== elapsed){
     roast.lastPromptAt = elapsed;
     beep(1000, 220, 0.6);
-    roast.pendingCrackLabel = null;
-    showTempPrompt(true);
+    if (document.getElementById('tempPrompt').hidden){
+      roast.pendingCrackLabel = null;
+      showTempPrompt(true);
+    } else {
+      roast.pending30Mark = true;
+    }
   }
 
   var hasNewConfirm = false;
@@ -816,6 +822,18 @@ document.addEventListener('DOMContentLoaded', function(){
     applyRoastPlan();
   });
 
+  // 時間（分/秒）只允許輸入數字
+  ['newPlanEventMin', 'newPlanEventSec'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', function(){
+      this.value = this.value.replace(/[^0-9]/g, '');
+    });
+  });
+  // 數值只允許輸入 1-9 的單一數字
+  document.getElementById('newPlanEventValue').addEventListener('input', function(){
+    var digits = this.value.replace(/[^1-9]/g, '');
+    this.value = digits.slice(-1);
+  });
+
   // 新增自訂操作提醒
   document.getElementById('btnAddPlanEvent').addEventListener('click', function(){
     var min = parseInt(document.getElementById('newPlanEventMin').value || '0', 10);
@@ -825,7 +843,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var err = document.getElementById('planEventFormError');
     var seconds = (min || 0) * 60 + (sec || 0);
     if (seconds < 0){ err.textContent = '請輸入正確的時間'; return; }
-    if (!value){ err.textContent = '請輸入數值'; return; }
+    if (!value || !/^[1-9]$/.test(value)){ err.textContent = '請輸入 1-9 的數值'; return; }
     err.textContent = '';
     state.planEvents.push({ id: uid(), seconds: seconds, type: type, value: value });
     renderPlanEventList();
@@ -864,6 +882,7 @@ document.addEventListener('DOMContentLoaded', function(){
       crackEvents: [],
       pendingCrackLabel: null,
       pendingFinish: false,
+      pending30Mark: false,
       firstCrackTime: null,
       pendingConfirms: [],
       weightBefore: parseFloat(document.getElementById('weightBefore').value) || null,
@@ -986,6 +1005,10 @@ document.addEventListener('DOMContentLoaded', function(){
     } else {
       drawLiveCurve();
       updateRorReadout();
+      if (roast.pending30Mark){
+        roast.pending30Mark = false;
+        showTempPrompt(true);
+      }
     }
   });
 
@@ -1183,6 +1206,59 @@ document.addEventListener('DOMContentLoaded', function(){
     return { width: tableW, height: tableH };
   }
 
+  // 生豆資訊表格（與畫面上「生豆資訊」表格版面一致）：兩欄標籤＋數值並排
+  function drawExportBeanInfoTable(ctx, x0, y0, tableW){
+    var rowH = 28;
+    var labelW = 96;
+    var valueW = (tableW - labelW * 2) / 2;
+    var gb = roast.greenBean || {};
+    function v(val){ return val || '—'; }
+    var rows = [
+      ['國家／地區', v(gb.origin), '莊園', v(gb.farm)],
+      ['公司', v(gb.company), '品種', v(gb.variety)],
+      ['處理法', v(gb.process), '價格／1kg', v(gb.price)],
+      ['瑕疵率(%)', v(gb.defectRate), '含水率(%)', v(gb.moisture)],
+      ['密度', v(gb.density), '備註', v(gb.notes)]
+    ];
+    var tableH = rows.length * rowH;
+
+    ctx.fillStyle = '#F3E9D8';
+    ctx.fillRect(x0, y0, tableW, tableH);
+
+    rows.forEach(function(r, ri){
+      var ry = y0 + ri * rowH;
+      var cx = x0;
+      ctx.textAlign = 'left';
+
+      ctx.fillStyle = '#E8D9BE'; ctx.fillRect(cx, ry, labelW, rowH);
+      ctx.fillStyle = '#6B5D4F'; ctx.font = '11px sans-serif';
+      ctx.fillText(r[0], cx + 8, ry + rowH / 2 + 4);
+      cx += labelW;
+
+      ctx.fillStyle = '#2A211B'; ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(r[1], cx + 8, ry + rowH / 2 + 4);
+      cx += valueW;
+
+      ctx.fillStyle = '#E8D9BE'; ctx.fillRect(cx, ry, labelW, rowH);
+      ctx.fillStyle = '#6B5D4F'; ctx.font = '11px sans-serif';
+      ctx.fillText(r[2], cx + 8, ry + rowH / 2 + 4);
+      cx += labelW;
+
+      ctx.fillStyle = '#2A211B'; ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(r[3], cx + 8, ry + rowH / 2 + 4);
+    });
+
+    ctx.strokeStyle = '#C9B693';
+    ctx.lineWidth = 1;
+    for (var i = 0; i <= rows.length; i++){
+      var ly = y0 + i * rowH;
+      ctx.beginPath(); ctx.moveTo(x0, ly); ctx.lineTo(x0 + tableW, ly); ctx.stroke();
+    }
+    ctx.strokeRect(x0, y0, tableW, tableH);
+
+    return tableH;
+  }
+
   // 匯出 JPG
   document.getElementById('btnExportJpg').addEventListener('click', function(){
     if (!roast) return;
@@ -1194,9 +1270,11 @@ document.addEventListener('DOMContentLoaded', function(){
     var headerH = 144;
     var stepBandH = hasFanPowerEvents(roast.triggeredLog) ? 130 : 0;
     var chartH = 340 + stepBandH + (stepBandH > 0 ? 22 : 0);
+    var beanTitleH = 34;
+    var beanTableH = 5 * 28;
     var tableTitleH = 34;
     var tableH = Math.max(cols.length ? 7 * 30 : 30, 30);
-    var totalH = headerH + chartH + tableTitleH + tableH + 50;
+    var totalH = headerH + chartH + beanTitleH + beanTableH + tableTitleH + tableH + 50;
 
     var canvas = document.createElement('canvas');
     canvas.width = w;
@@ -1216,8 +1294,8 @@ document.addEventListener('DOMContentLoaded', function(){
     var levelCoarse = document.getElementById('roastLevelCoarse').value;
     var levelFine = document.getElementById('roastLevelFine').value;
     var levelBeanNum = parseFloat(levelBean);
-    var diffCoarseVal = (!isNaN(levelBeanNum) && levelCoarse !== '' && !isNaN(parseFloat(levelCoarse))) ? (levelBeanNum - parseFloat(levelCoarse)).toFixed(1) : null;
-    var diffFineVal = (!isNaN(levelBeanNum) && levelFine !== '' && !isNaN(parseFloat(levelFine))) ? (levelBeanNum - parseFloat(levelFine)).toFixed(1) : null;
+    var diffCoarseVal = (!isNaN(levelBeanNum) && levelCoarse !== '' && !isNaN(parseFloat(levelCoarse))) ? Math.abs(levelBeanNum - parseFloat(levelCoarse)).toFixed(1) : null;
+    var diffFineVal = (!isNaN(levelBeanNum) && levelFine !== '' && !isNaN(parseFloat(levelFine))) ? Math.abs(levelBeanNum - parseFloat(levelFine)).toFixed(1) : null;
 
     // 依序畫出多段不同顏色的文字，回傳畫完後的 x 座標
     function drawTextSegments(segments, x, y){
@@ -1253,7 +1331,14 @@ document.addEventListener('DOMContentLoaded', function(){
 
     renderChart(ctx, 24, headerH, w - 48, chartH - 20, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents);
 
-    var tableY = headerH + chartH + tableTitleH;
+    var beanY = headerH + chartH + beanTitleH;
+    ctx.fillStyle = '#BD6B2E';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('生豆資訊', 24, beanY - 12);
+    drawExportBeanInfoTable(ctx, 24, beanY, w - 48);
+
+    var tableY = beanY + beanTableH + tableTitleH;
     ctx.fillStyle = '#BD6B2E';
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'left';

@@ -124,9 +124,9 @@
           <div class="field-grid field-grid--3">
             <label>時間（分:秒）
               <div class="time-input">
-                <input type="number" id="newPlanEventMin" min="0" placeholder="分">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newPlanEventMin" placeholder="分">
                 <span>:</span>
-                <input type="number" id="newPlanEventSec" min="0" max="59" placeholder="秒">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newPlanEventSec" placeholder="秒">
               </div>
             </label>
             <label>項目
@@ -135,8 +135,8 @@
                 <option value="火力">火力</option>
               </select>
             </label>
-            <label>數值
-              <input type="text" id="newPlanEventValue" placeholder="例如：9">
+            <label>數值（1-9）
+              <input type="text" inputmode="numeric" pattern="[1-9]" maxlength="1" id="newPlanEventValue" placeholder="1-9">
             </label>
           </div>
           <div class="form-error" id="planEventFormError"></div>
@@ -182,7 +182,7 @@
 
       <div class="control-row">
         <button type="button" id="btnPauseResume" class="btn btn--ghost">暫停</button>
-        <button type="button" id="btnManualTemp" class="btn btn--ghost">手動記錄溫度</button>
+        <button type="button" id="btnManualTemp" class="btn btn--ghost">手動記溫</button>
         <button type="button" id="btnEndRoastQuick" class="btn btn--danger">結束烘豆</button>
       </div>
 

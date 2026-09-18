@@ -36,16 +36,16 @@ button:focus-visible, input:focus-visible, select:focus-visible{
 }
 
 /* 提示：App 內建瀏覽器（LINE／IG／FB／微信等）開啟時，列印與另存圖片功能受限，提示改用手機瀏覽器開啟 */
+/* 顯示／隱藏完全由 JS 直接控制 inline style（overlay.style.display），這裡的 class 只負責外觀，
+   不寫 display，避免再次發生「CSS 蓋掉顯示/隱藏狀態」的問題 */
 .iab-overlay{
   position:fixed; inset:0; z-index:100;
   background:rgba(36,23,18,0.92);
-  display:flex; align-items:center; justify-content:center;
+  align-items:center; justify-content:center;
   padding:24px;
 }
-/* 這條規則務必要有，否則 .iab-overlay 的 display:flex 會蓋掉 hidden 屬性原本該有的 display:none，
-   導致無論有沒有偵測到 App 內建瀏覽器，提示都會一直顯示、也無法透過 hidden=true 關閉 */
-.iab-overlay[hidden]{ display:none !important; }
 .iab-card{
+  position:relative;
   width:100%; max-width:360px;
   background:var(--parchment);
   border:1px solid var(--line);
@@ -53,6 +53,14 @@ button:focus-visible, input:focus-visible, select:focus-visible{
   padding:28px 22px 22px;
   text-align:center;
   box-shadow:0 12px 40px rgba(0,0,0,0.35);
+}
+.iab-close{
+  position:absolute; top:10px; right:10px;
+  width:30px; height:30px; border-radius:50%;
+  background:var(--parchment-deep); border:1px solid var(--line);
+  color:var(--ink-soft); font-size:14px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  padding:0;
 }
 .iab-icon{
   width:64px; height:64px; margin:0 auto 16px;

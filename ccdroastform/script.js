@@ -8,8 +8,10 @@ var wakeLock = null;
 var audioCtx = null;
 
 // ---------- App 內建瀏覽器（LINE／IG／FB／微信等 WebView）偵測 ----------
-// 這類 App 內建瀏覽器通常限制或阻擋「列印」「另存圖片」等功能，UA 字串裡大多會帶有各自 App 的專屬標記，
-// Android 的 WebView（非系統瀏覽器）則常見於 UA 尾端帶有「; wv)」
+// 這類 App 內建瀏覽器通常限制或阻擋「列印」「另存圖片」等功能，UA 字串裡大多會帶有各自 App 的專屬標記。
+// 注意：先前曾用「Android 且 UA 含 ; wv)」這種通用寫法去猜測「是不是 WebView」，但這條規則太粗略，
+// 在部分 Android 手機的預設瀏覽器上也可能誤判成 App 內建瀏覽器，造成「明明用瀏覽器開啟卻還是跳提示」，
+// 所以拿掉這條通用判斷，只保留各家 App 專屬、不會跟一般瀏覽器 UA 混淆的關鍵字，避免誤判。
 function isInAppBrowser(){
   var ua = navigator.userAgent || '';
   var patterns = [
@@ -17,26 +19,28 @@ function isInAppBrowser(){
     /Instagram/i,                      // Instagram
     /\bLine\//i,                       // LINE
     /MicroMessenger/i,                 // 微信 WeChat
-    /\bTwitter\b/i,                    // Twitter / X App
     /TikTok|musical_ly|BytedanceWebview/i, // TikTok
-    /Threads/i,                        // Threads
-    /MQQBrowser|QQ\/|QQBrowser/i,      // QQ
+    /\bThreads\b/i,                    // Threads
+    /MQQBrowser|QQBrowser/i,           // QQ
     /WeiBo/i,                          // 微博
     /Snapchat/i                        // Snapchat
   ];
-  if (patterns.some(function(re){ return re.test(ua); })) return true;
-  if (/Android/i.test(ua) && /; ?wv\)/i.test(ua)) return true;
-  return false;
+  return patterns.some(function(re){ return re.test(ua); });
 }
 document.addEventListener('DOMContentLoaded', function(){
-  if (!isInAppBrowser()) return;
   var overlay = document.getElementById('inAppBrowserOverlay');
   if (!overlay) return;
-  overlay.hidden = false;
-  var btn = document.getElementById('btnDismissInAppNotice');
-  if (btn){
-    btn.addEventListener('click', function(){ overlay.hidden = true; });
-  }
+  // 顯示／隱藏一律直接設定 inline style，不依賴 hidden 屬性或 CSS 選擇器優先權，
+  // 避免再次發生「CSS 規則蓋掉顯示狀態、導致怎麼按都關不掉」的問題
+  function hideOverlay(){ overlay.style.display = 'none'; }
+  function showOverlay(){ overlay.style.display = 'flex'; }
+
+  if (isInAppBrowser()) showOverlay(); else hideOverlay();
+
+  var dismissBtn = document.getElementById('btnDismissInAppNotice');
+  if (dismissBtn) dismissBtn.addEventListener('click', hideOverlay);
+  var closeBtn = document.getElementById('btnCloseInAppNotice');
+  if (closeBtn) closeBtn.addEventListener('click', hideOverlay);
 });
 
 // ---------- 小工具 ----------

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>烘焙控制台</title>
+<title>烘豆小助手</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,8 +12,8 @@
 <body>
 <div class="app">
   <header class="appbar">
-    <span class="appbar__eyebrow">C.C.D. 烘豆小助手 手機版</span>
-    <span class="appbar__title" id="appbarTitle">烘焙控制台</span>
+    <span class="appbar__title" id="appbarTitle">烘豆小助手</span>
+    <span class="appbar__subtitle" id="appbarSubtitle" hidden></span>
   </header>
 
   <main>
@@ -169,7 +169,6 @@
     <!-- 烘豆進行頁 -->
     <section id="screen-roast" class="screen" hidden>
       <div class="roast-meta">
-        <span id="roastMachineName">—</span>
         <span id="roastDate">—</span>
       </div>
 
@@ -259,7 +258,6 @@
     <!-- 結果頁 -->
     <section id="screen-result" class="screen" hidden>
       <div class="result-summary">
-        <h2 id="resultMachineName">—</h2>
         <p id="resultMeta">—</p>
       </div>
 
@@ -267,7 +265,10 @@
         <div class="panel__head"><h2 class="panel__title">烘焙摘要</h2></div>
         <div class="panel__body">
         <dl class="summary-grid" id="summaryGrid">
-          <div><dt>發展時間比 DTR</dt><dd id="summaryDtr">—</dd></div>
+          <div><dt>發展時間</dt><dd id="summaryDevTime">—</dd></div>
+          <div><dt>發展百分比</dt><dd id="summaryDevPercent">—</dd></div>
+        </dl>
+        <dl class="summary-grid">
           <div><dt>總升溫</dt><dd id="summaryRise">—</dd></div>
           <div><dt>失重</dt><dd id="summaryLoss">—</dd></div>
         </dl>
@@ -326,6 +327,8 @@
         <button type="button" id="btnNewRoast" class="btn btn--ghost btn--block">開始新的烘焙</button>
       </div>
     </section>
+
+    <p class="app-footer-note">C.C.D. 烘豆小助手 手機版</p>
 
     <!-- 列印專用：白底版烘焙紀錄圖，內容與 JPG 匯出一致，平常隱藏，只在列印時顯示 -->
     <img id="printExportImage" alt="烘焙紀錄">

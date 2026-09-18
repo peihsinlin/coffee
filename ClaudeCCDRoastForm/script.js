@@ -185,8 +185,14 @@ function speak(text){
   // 若在風力、火力同時觸發、幾乎同時呼叫 speak() 時貿然 cancel()，會把前一句正在播放或剛要開始的
   // 語音打斷／清掉，這正是「風力聲音不見」「第一個字被蓋住」的成因，改成不主動 cancel、讓它們照順序播完。
   var u = new SpeechSynthesisUtterance(text);
-  var zh = pickZhVoice();
-  if (zh) { u.voice = zh; u.lang = zh.lang; } else { u.lang = 'zh-TW'; }
+  if (isIOS()){
+    // iOS Safari 有已知問題：明確指定 utterance.voice 有時反而會挑到系統預設（英文、常是男聲）的語音，
+    // 只設定 lang 為 zh-TW、不指定 voice，才會正確用回系統內建的中文女聲（Mei-Jia）
+    u.lang = 'zh-TW';
+  } else {
+    var zh = pickZhVoice();
+    if (zh) { u.voice = zh; u.lang = zh.lang; } else { u.lang = 'zh-TW'; }
+  }
   u.rate = 1;
   window.speechSynthesis.speak(u);
 }
@@ -686,17 +692,19 @@ function findEventByKeyword(triggeredLog, keyword){
 }
 
 function computeSummary(){
-  var summary = { dtrText: '—', riseText: '—', lossText: '—' };
+  var summary = { dtrText: '—', devTimeText: '—', devPercentText: '—', riseText: '—', lossText: '—' };
   if (!roast) return summary;
 
-  // 發展時間比 DTR = (結束時間 - 一爆開始時間) / 結束時間
+  // 發展時間比 DTR = (結束時間 - 一爆開始時間) / 結束時間，拆成「發展時間」「發展百分比」兩個獨立數值顯示
   var firstCrack = findEventByKeyword(roast.crackEvents, '一爆');
   var dropEvent = findEventByKeyword(roast.crackEvents, '結束烘豆') || findEventByKeyword(roast.crackEvents, '下豆');
   var endT = dropEvent ? dropEvent.t : roast.elapsed;
   if (firstCrack && endT > firstCrack.t){
     var devTime = endT - firstCrack.t;
     var dtr = (devTime / endT) * 100;
-    summary.dtrText = formatTime(devTime) + '　' + dtr.toFixed(1) + '%';
+    summary.devTimeText = formatTime(devTime);
+    summary.devPercentText = dtr.toFixed(1) + '%';
+    summary.dtrText = summary.devTimeText + '　' + summary.devPercentText;
   }
 
   // 總升溫 = 下豆溫度（或最後一筆溫度）－ 回溫點溫度（或第一筆溫度）
@@ -718,15 +726,31 @@ function computeSummary(){
   return summary;
 }
 
-// 找出離 targetT 最近、且在 tolerance 秒內的觸發事件，用來對齊表格欄位
-function findNearestEventForColumn(triggeredLog, prefix, targetT, tolerance){
-  var best = null, bestDiff = tolerance;
+// 幫「風速／火力」欄位做一對一配對：每個事件只會配到離它最近的一個欄位。
+// 原本的做法是每一欄各自獨立找「容許誤差內最近的事件」，若兩個相鄰欄位剛好都落在同一個事件的容許誤差
+// 範圍內（例如 02:41、03:03 都在 20 秒內能配到 03:00 觸發的事件），就會讓同一筆事件被重複帶入兩欄，
+// 例如「02:41 只有手動記溫」卻被誤帶入 03:00 的風速值。改成先列出所有「事件—欄位」的合法配對，
+// 依距離由近到遠排序，再依序搶配（一個事件配一欄、一欄配一個事件），確保不會重複。
+function buildEventColumnMap(cols, triggeredLog, prefix, tolerance){
+  var candidates = [];
   triggeredLog.forEach(function(ev){
     if (ev.label.indexOf(prefix) !== 0) return;
-    var diff = Math.abs(ev.t - targetT);
-    if (diff <= bestDiff){ bestDiff = diff; best = ev; }
+    cols.forEach(function(p, idx){
+      var diff = Math.abs(ev.t - p.t);
+      if (diff <= tolerance) candidates.push({ ev: ev, idx: idx, diff: diff });
+    });
   });
-  return best ? best.label.replace(prefix + ' ', '') : '';
+  candidates.sort(function(a, b){ return a.diff - b.diff; });
+  var usedCols = {};
+  var usedEvents = [];
+  var map = {};
+  candidates.forEach(function(c){
+    if (usedCols[c.idx] || usedEvents.indexOf(c.ev) !== -1) return;
+    usedCols[c.idx] = true;
+    usedEvents.push(c.ev);
+    map[c.idx] = c.ev.label.replace(prefix + ' ', '');
+  });
+  return map;
 }
 
 // 計算「30秒升溫」列：當格溫度減「往回最近一個非事件欄位」的溫度，跳過事件（爆點）欄位當基準，
@@ -823,12 +847,14 @@ function renderLogTable(targetId){
     return '<td' + tdClass(ev ? 'lt-event-cell' : null, p.t) + '>' + (ev ? escapeHtml(ev.label) : '') + '</td>';
   }).join('') + '</tr>';
 
-  rows += '<tr><th>風速</th>' + cols.map(function(p){
-    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(findNearestEventForColumn(roast.triggeredLog, '風力', p.t, 20)) + '</td>';
+  var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風力', 20);
+  rows += '<tr><th>風速</th>' + cols.map(function(p, i){
+    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(windMap[i] || '') + '</td>';
   }).join('') + '</tr>';
 
-  rows += '<tr><th>火力</th>' + cols.map(function(p){
-    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(findNearestEventForColumn(roast.triggeredLog, '火力', p.t, 20)) + '</td>';
+  var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20);
+  rows += '<tr><th>火力</th>' + cols.map(function(p, i){
+    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(powerMap[i] || '') + '</td>';
   }).join('') + '</tr>';
 
   if (isLive){
@@ -876,7 +902,8 @@ function renderBeanInfoTable(targetId){
 
 function renderSummary(){
   var s = computeSummary();
-  document.getElementById('summaryDtr').textContent = s.dtrText;
+  document.getElementById('summaryDevTime').textContent = s.devTimeText;
+  document.getElementById('summaryDevPercent').textContent = s.devPercentText;
   document.getElementById('summaryRise').textContent = s.riseText;
   document.getElementById('summaryLoss').textContent = s.lossText;
   return s;
@@ -1077,8 +1104,10 @@ document.addEventListener('DOMContentLoaded', function(){
       })
     };
 
-    document.getElementById('appbarTitle').textContent = roast.machineName + ' 烘豆控制台';
-    document.getElementById('roastMachineName').textContent = '烘豆師：' + (roast.session.roasterName || '—');
+    document.getElementById('appbarTitle').textContent = '烘豆小助手';
+    var appbarSubtitle = document.getElementById('appbarSubtitle');
+    appbarSubtitle.textContent = '目前烘豆機：' + roast.machineName;
+    appbarSubtitle.hidden = false;
     document.getElementById('roastDate').textContent = roast.dateStr;
     document.getElementById('timerDisplay').textContent = '00:00';
     document.getElementById('rorReadout').textContent = 'RoR（升溫速率）－';
@@ -1244,7 +1273,6 @@ document.addEventListener('DOMContentLoaded', function(){
     roast.running = false;
     releaseWakeLock();
 
-    document.getElementById('resultMachineName').textContent = roast.machineName;
     document.getElementById('resultMeta').textContent = roast.dateStr + ' · 總時間 ' + formatTime(roast.elapsed);
     renderSummary();
     renderBeanInfoTable('resultBeanInfoBody');
@@ -1269,7 +1297,10 @@ document.addEventListener('DOMContentLoaded', function(){
   // 開始新的烘焙
   document.getElementById('btnNewRoast').addEventListener('click', function(){
     roast = null;
-    document.getElementById('appbarTitle').textContent = '烘焙控制台';
+    document.getElementById('appbarTitle').textContent = '烘豆小助手';
+    var appbarSubtitle = document.getElementById('appbarSubtitle');
+    appbarSubtitle.textContent = '';
+    appbarSubtitle.hidden = true;
     showScreen('setup');
   });
 
@@ -1309,12 +1340,14 @@ document.addEventListener('DOMContentLoaded', function(){
           var ev = (roast.crackEvents || []).find(function(e){ return e.t === p.t; });
           return { text: ev ? ev.label : '', crack: !!ev, style: ev ? 'event' : null };
         }) },
-      { label: '風速', cells: cols.map(function(p){
-          return { text: findNearestEventForColumn(roast.triggeredLog, '風力', p.t, 20), crack: isCrackCol(p.t) };
-        }) },
-      { label: '火力', cells: cols.map(function(p){
-          return { text: findNearestEventForColumn(roast.triggeredLog, '火力', p.t, 20), crack: isCrackCol(p.t) };
-        }) }
+      { label: '風速', cells: (function(){
+          var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風力', 20);
+          return cols.map(function(p, i){ return { text: windMap[i] || '', crack: isCrackCol(p.t) }; });
+        })() },
+      { label: '火力', cells: (function(){
+          var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20);
+          return cols.map(function(p, i){ return { text: powerMap[i] || '', crack: isCrackCol(p.t) }; });
+        })() }
     ];
     return rowDefs;
   }
@@ -1473,9 +1506,9 @@ document.addEventListener('DOMContentLoaded', function(){
     ctx.fillRect(0, 0, w, totalH);
 
     var gb = roast.greenBean || {};
-    var beanParts = [gb.origin, gb.farm, gb.process].filter(function(v){ return v; });
+    var beanParts = [gb.origin, gb.farm, gb.variety, gb.process].filter(function(v){ return v; });
     var line1Text = (beanParts.length ? beanParts.join(' · ') + ' ' : '') + '烘焙紀錄';
-    var line2Text = roast.machineName + '　烘豆師：' + ((roast.session && roast.session.roasterName) || '—') + '　' + roast.dateStr;
+    var line2Text = '烘豆機：' + roast.machineName + '　烘豆師：' + ((roast.session && roast.session.roasterName) || '—') + '　烘豆時間：' + roast.dateStr;
     var line3Text = '總時間 ' + formatTime(roast.elapsed) + '　DTR ' + summary.dtrText + '　總升溫 ' + summary.riseText + '　失重 ' + summary.lossText;
     var weightAfterVal = document.getElementById('weightAfter').value;
     var levelBean = document.getElementById('roastLevelBean').value;
@@ -1543,7 +1576,7 @@ document.addEventListener('DOMContentLoaded', function(){
     ctx.fillStyle = palette.footer;
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('由烘焙控制台匯出', 24, totalH - 16);
+    ctx.fillText('由烘豆小助手匯出', 24, totalH - 16);
 
     return canvas;
   }
@@ -1554,7 +1587,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
     canvas.toBlob(function(blob){
       var dateStr = new Date().toISOString().slice(0, 10);
-      var filename = 'roast-' + dateStr + '.jpg';
+      var gb = roast.greenBean || {};
+      var nameParts = [gb.origin, gb.farm, gb.variety, gb.process].filter(function(v){ return v; });
+      var beanNamePart = nameParts.join(' ').replace(/[\\/:*?"<>|]/g, '');
+      var filename = '烘焙紀錄-' + (beanNamePart ? beanNamePart + '-' : '') + dateStr + '.jpg';
 
       // iPhone（iOS Safari）不支援 <a download> 直接存檔，只會開新分頁，改用 Web Share API
       // 讓使用者直接「儲存影像」到相簿；Android 的 canShare 也可能回傳 true，但那邊原本的

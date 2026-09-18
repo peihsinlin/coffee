@@ -10,6 +10,33 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- 提示：在 LINE／IG／FB 等 App 內建瀏覽器開啟時，列印與另存圖片功能會受限，提示改用手機瀏覽器開啟 -->
+<div id="inAppBrowserOverlay" class="iab-overlay" hidden>
+  <div class="iab-card">
+    <div class="iab-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+        <line x1="3" y1="9" x2="21" y2="9"></line>
+        <circle cx="6.5" cy="6.5" r="0.6" fill="currentColor" stroke="none"></circle>
+        <circle cx="9" cy="6.5" r="0.6" fill="currentColor" stroke="none"></circle>
+      </svg>
+    </div>
+    <p class="iab-eyebrow">為了完整使用列印與另存圖片</p>
+    <h2 class="iab-title">請用瀏覽器開啟</h2>
+    <p class="iab-desc">目前所在的 App 內建瀏覽器功能有限，請切換至手機瀏覽器使用：</p>
+    <div class="iab-step">
+      <span class="iab-step__num">1</span>
+      <span class="iab-step__text">點選畫面右上或右下角的「⋮」或「…」選單</span>
+    </div>
+    <div class="iab-step">
+      <span class="iab-step__num">2</span>
+      <span class="iab-step__text">選擇「在瀏覽器中開啟」<br><span class="iab-step__hint">（不同 App 的瀏覽器描述可能會略有不同）</span></span>
+    </div>
+    <button type="button" id="btnDismissInAppNotice" class="iab-dismiss">已經是用瀏覽器開啟，繼續使用</button>
+  </div>
+</div>
+
 <div class="app">
   <header class="appbar">
     <span class="appbar__title" id="appbarTitle">烘豆小助手</span>

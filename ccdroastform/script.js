@@ -7,6 +7,38 @@ var timerInterval = null;
 var wakeLock = null;
 var audioCtx = null;
 
+// ---------- App 內建瀏覽器（LINE／IG／FB／微信等 WebView）偵測 ----------
+// 這類 App 內建瀏覽器通常限制或阻擋「列印」「另存圖片」等功能，UA 字串裡大多會帶有各自 App 的專屬標記，
+// Android 的 WebView（非系統瀏覽器）則常見於 UA 尾端帶有「; wv)」
+function isInAppBrowser(){
+  var ua = navigator.userAgent || '';
+  var patterns = [
+    /FBAN|FBAV/i,                      // Facebook
+    /Instagram/i,                      // Instagram
+    /\bLine\//i,                       // LINE
+    /MicroMessenger/i,                 // 微信 WeChat
+    /\bTwitter\b/i,                    // Twitter / X App
+    /TikTok|musical_ly|BytedanceWebview/i, // TikTok
+    /Threads/i,                        // Threads
+    /MQQBrowser|QQ\/|QQBrowser/i,      // QQ
+    /WeiBo/i,                          // 微博
+    /Snapchat/i                        // Snapchat
+  ];
+  if (patterns.some(function(re){ return re.test(ua); })) return true;
+  if (/Android/i.test(ua) && /; ?wv\)/i.test(ua)) return true;
+  return false;
+}
+document.addEventListener('DOMContentLoaded', function(){
+  if (!isInAppBrowser()) return;
+  var overlay = document.getElementById('inAppBrowserOverlay');
+  if (!overlay) return;
+  overlay.hidden = false;
+  var btn = document.getElementById('btnDismissInAppNotice');
+  if (btn){
+    btn.addEventListener('click', function(){ overlay.hidden = true; });
+  }
+});
+
 // ---------- 小工具 ----------
 function formatTime(totalSeconds){
   var m = Math.floor(totalSeconds / 60);

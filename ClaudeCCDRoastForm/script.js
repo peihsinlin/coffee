@@ -29,9 +29,9 @@ function updateStartButton(){
   document.getElementById('btnStartRoast').disabled = !(machineOk && nameOk && regionOk && weightOk && tempOk);
 }
 
-// ---------- 自訂操作提醒（風力／火力） ----------
+// ---------- 自訂操作提醒（風速／火力） ----------
 function renderPlanEventList(){
-  var wind = state.planEvents.filter(function(ev){ return ev.type === '風力'; }).sort(function(a,b){ return a.seconds - b.seconds; });
+  var wind = state.planEvents.filter(function(ev){ return ev.type === '風速'; }).sort(function(a,b){ return a.seconds - b.seconds; });
   var fire = state.planEvents.filter(function(ev){ return ev.type === '火力'; }).sort(function(a,b){ return a.seconds - b.seconds; });
 
   function renderList(elId, items){
@@ -87,7 +87,7 @@ function applyRoastPlan(){
 // ---------- 音效與語音 ----------
 // iPhone（iOS Safari）在背景或閒置一段時間後會把 AudioContext 自動 suspend，
 // resume() 又是非同步的：如果沒等 resume 完成就排音效，聲音會直接消失不會播放，
-// 這是「風力／火力沒有聲音提醒」的主因，因此這裡改成等 resume 完成後才真正播放。
+// 這是「風速／火力沒有聲音提醒」的主因，因此這裡改成等 resume 完成後才真正播放。
 // 判斷是否為 iPhone／iPad（iPadOS 13+ 會偽裝成 MacIntel，用觸控點數輔助判斷）
 function isIOS(){
   return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -96,8 +96,14 @@ function isIOS(){
 
 function ensureAudioCtx(){
   if (!audioCtx){
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) audioCtx = new AC();
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    } catch (e){
+      // 部分 Android 瀏覽器（如 Samsung Internet）在某些情況下建立 AudioContext 會丟出例外，
+      // 這裡務必接住，避免整個「開始烘豆」的點擊處理被中斷、導致畫面完全沒反應
+      audioCtx = null;
+    }
   }
   return audioCtx;
 }
@@ -182,8 +188,8 @@ function pickZhVoice(){
 function speak(text){
   if (!('speechSynthesis' in window)) return;
   // 注意：這裡刻意不在播放前呼叫 cancel()。Web Speech API 本身就會把多個 speak() 依序排隊播放，
-  // 若在風力、火力同時觸發、幾乎同時呼叫 speak() 時貿然 cancel()，會把前一句正在播放或剛要開始的
-  // 語音打斷／清掉，這正是「風力聲音不見」「第一個字被蓋住」的成因，改成不主動 cancel、讓它們照順序播完。
+  // 若在風速、火力同時觸發、幾乎同時呼叫 speak() 時貿然 cancel()，會把前一句正在播放或剛要開始的
+  // 語音打斷／清掉，這正是「風速聲音不見」「第一個字被蓋住」的成因，改成不主動 cancel、讓它們照順序播完。
   var u = new SpeechSynthesisUtterance(text);
   if (isIOS()){
     // iOS Safari 有已知問題：明確指定 utterance.voice 有時反而會挑到系統預設（英文、常是男聲）的語音，
@@ -293,11 +299,11 @@ function computeRorSeries(tempLog){
 }
 
 function hasFanPowerEvents(triggeredLog){
-  return triggeredLog.some(function(ev){ return ev.label.indexOf('風力') === 0 || ev.label.indexOf('火力') === 0; });
+  return triggeredLog.some(function(ev){ return ev.label.indexOf('風速') === 0 || ev.label.indexOf('火力') === 0; });
 }
 
-// 風力／火力階梯圖，畫在主曲線下方，藍色F=風力、橘色P=火力，仿照烘豆機軟體常見畫法
-// 風力／火力階梯圖：F、P 共用同一個數值刻度，數值相同時線會交叉，畫法參考烘豆機軟體常見樣式
+// 風速／火力階梯圖，畫在主曲線下方，藍色F=風速、橘色P=火力，仿照烘豆機軟體常見畫法
+// 風速／火力階梯圖：F、P 共用同一個數值刻度，數值相同時線會交叉，畫法參考烘豆機軟體常見樣式
 function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
   var allVals = fanItems.concat(powerItems)
     .map(function(it){ var v = parseFloat(it.value); return isNaN(v) ? null : v; })
@@ -359,7 +365,7 @@ function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
   // 左側小圖例
   ctx.font = 'bold 9px monospace';
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#3E6B8A'; ctx.fillText('F 風力', x0, yTop - 2);
+  ctx.fillStyle = '#3E6B8A'; ctx.fillText('F 風速', x0, yTop - 2);
   ctx.fillStyle = '#BD6B2E'; ctx.fillText('P 火力', x0 + 44, yTop - 2);
 }
 
@@ -537,13 +543,13 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
     ctx.fillText(formatTime(tt), xScale(tt), y0 + mainH - 8);
   }
 
-  // 風力／火力階梯圖（僅在有這類事件時顯示），跟上方圖表隔開一段距離
+  // 風速／火力階梯圖（僅在有這類事件時顯示），跟上方圖表隔開一段距離
   if (stepBandH > 0){
     var stepTop = y0 + mainH + stepGap;
     ctx.strokeStyle = th.border;
     ctx.beginPath(); ctx.moveTo(x0, stepTop - stepGap / 2); ctx.lineTo(x0 + w, stepTop - stepGap / 2); ctx.stroke();
-    var fanItems = triggeredLog.filter(function(ev){ return ev.label.indexOf('風力') === 0; })
-      .map(function(ev){ return { t: ev.t, value: ev.label.replace('風力 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
+    var fanItems = triggeredLog.filter(function(ev){ return ev.label.indexOf('風速') === 0; })
+      .map(function(ev){ return { t: ev.t, value: ev.label.replace('風速 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
     var powerItems = triggeredLog.filter(function(ev){ return ev.label.indexOf('火力') === 0; })
       .map(function(ev){ return { t: ev.t, value: ev.label.replace('火力 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
     drawStepChart(ctx, x0 + padL, stepTop, w - padL - padR, stepBandH, xScale, fanItems, powerItems);
@@ -585,8 +591,8 @@ function hideTempPrompt(){
   panel.classList.remove('capture-panel--active');
 }
 
-// ---------- 風力／火力提醒的確認提示（時間到時除了語音提示外，需按確認才寫入紀錄；超過10秒沒動作則自動寫入） ----------
-// 若風力、火力同時到達提醒時間，兩筆會同時列出，各自獨立確認／倒數，不互相排隊等待
+// ---------- 風速／火力提醒的確認提示（時間到時除了語音提示外，需按確認才寫入紀錄；超過10秒沒動作則自動寫入） ----------
+// 若風速、火力同時到達提醒時間，兩筆會同時列出，各自獨立確認／倒數，不互相排隊等待
 function renderConfirmPanel(){
   var panel = document.getElementById('eventConfirmPanel');
   var list = document.getElementById('eventConfirmList');
@@ -631,7 +637,7 @@ function hideEventConfirm(){
   document.getElementById('eventConfirmList').innerHTML = '';
 }
 
-// ---------- 烘豆中彈性更改風力／火力 ----------
+// ---------- 烘豆中彈性更改風速／火力 ----------
 function hideAdjustPanel(){
   var panel = document.getElementById('adjustPanel');
   panel.hidden = true;
@@ -642,7 +648,7 @@ function clampAdjustValue(v){
   if (isNaN(v)) return 5;
   return Math.max(1, Math.min(9, v));
 }
-// 找出目前的風力／火力數值（紀錄中該類型最新一筆），沒有紀錄時預設 5
+// 找出目前的風速／火力數值（紀錄中該類型最新一筆），沒有紀錄時預設 5
 function getCurrentAdjustValue(type){
   if (!roast) return 5;
   var matches = roast.triggeredLog.filter(function(ev){ return ev.label.indexOf(type + ' ') === 0; });
@@ -753,15 +759,22 @@ function buildEventColumnMap(cols, triggeredLog, prefix, tolerance){
   return map;
 }
 
-// 計算「30秒升溫」列：當格溫度減「往回最近一個非事件欄位」的溫度，跳過事件（爆點）欄位當基準，
-// 避免像 07:03 這種下一格緊接在事件欄位（如一爆起）之後時，誤用事件當下的溫度當作起點算出錯誤（甚至變 0）的結果
+// 計算「30秒升溫」列：當格溫度減「最接近30秒前」的欄位溫度，而不是單純往回數一欄。
+// 因為有手動記溫時會插入不是整30秒格的欄位（例如 02:22 是手動記溫），若只是「往回一欄」，
+// 02:32 這種緊接在手動記溫欄位後面的整30秒格，就會誤用只隔 10 秒的 02:22 來算，而不是真正30秒前的 02:02，
+// 改成動態往回找離「目前時間－30秒」最接近（且在容許誤差內）的欄位，跳過事件（爆點）欄位當基準
 function compute30sRow(cols, isCrackCol){
   return cols.map(function(p, i){
     if (isCrackCol(p.t)) return null;
-    var prevIdx = i - 1;
-    while (prevIdx >= 0 && isCrackCol(cols[prevIdx].t)) prevIdx--;
-    if (prevIdx < 0) return null;
-    return Math.round(p.temp - cols[prevIdx].temp);
+    var target = p.t - 30;
+    var best = null, bestDiff = 15; // 只在離「30秒前」15秒內才算數
+    for (var k = i - 1; k >= 0; k--){
+      if (isCrackCol(cols[k].t)) continue;
+      var diff = Math.abs(cols[k].t - target);
+      if (diff < bestDiff){ bestDiff = diff; best = cols[k]; }
+    }
+    if (!best) return null;
+    return Math.round(p.temp - best.temp);
   });
 }
 
@@ -847,7 +860,7 @@ function renderLogTable(targetId){
     return '<td' + tdClass(ev ? 'lt-event-cell' : null, p.t) + '>' + (ev ? escapeHtml(ev.label) : '') + '</td>';
   }).join('') + '</tr>';
 
-  var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風力', 20);
+  var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風速', 20);
   rows += '<tr><th>風速</th>' + cols.map(function(p, i){
     return '<td' + tdClass(null, p.t) + '>' + escapeHtml(windMap[i] || '') + '</td>';
   }).join('') + '</tr>';
@@ -959,7 +972,7 @@ function tick(){
       ev.triggered = true;
       hasNewConfirm = true;
       var nearestTemp = findNearestTemp(roast.tempLog, elapsed);
-      // 時間到了先用語音／嗶聲提醒，實際是否寫入紀錄改由彈出的確認提示決定；若風力、火力同時到時間，會同時列在提示清單中
+      // 時間到了先用語音／嗶聲提醒，實際是否寫入紀錄改由彈出的確認提示決定；若風速、火力同時到時間，會同時列在提示清單中
       var pending = { t: elapsed, label: ev.label, temp: nearestTemp, timer: null };
       pending.timer = setTimeout(function(){
         var idx = roast.pendingConfirms.indexOf(pending);
@@ -968,7 +981,7 @@ function tick(){
       roast.pendingConfirms.push(pending);
 
       if (ev.seconds === 0){
-        // 烘豆一開始（0:00）就設定好的風力／火力，屬於起始設定而非中途提醒，
+        // 烘豆一開始（0:00）就設定好的風速／火力，屬於起始設定而非中途提醒，
         // 不需要嗶聲或語音打斷剛開始烘豆的當下，只留確認清單讓使用者確認寫入即可
       } else if (onGridMark){
         // 跟30秒的嗶聲同一秒：等嗶聲播完後直接語音播報，不要再多一次嘟聲造成混淆
@@ -1054,8 +1067,10 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('btnStartRoast').addEventListener('click', function(){
     var machineName = machineSelect.value;
     if (!machineName || !document.getElementById('roasterName').value.trim() || !document.getElementById('beanOrigin').value.trim() || !(parseFloat(document.getElementById('weightBefore').value) > 0) || !document.getElementById('sessionTemp').value.trim()) return;
-    primeAudio();
-    primeSpeech();
+    // 解鎖音效／語音失敗也不該卡住「開始烘豆」，某些 Android 瀏覽器在這一步丟例外時
+    // 若沒接住，會讓整個點擊處理中斷，畫面看起來像按了完全沒反應
+    try { primeAudio(); } catch (e){}
+    try { primeSpeech(); } catch (e){}
 
     roast = {
       machineName: machineName,
@@ -1203,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   });
 
-  // 風力／火力提醒確認：按確認才寫入紀錄，按取消則不寫入；同時到時間的提醒會各自獨立列出
+  // 風速／火力提醒確認：按確認才寫入紀錄，按取消則不寫入；同時到時間的提醒會各自獨立列出
   document.getElementById('eventConfirmList').addEventListener('click', function(e){
     var btn = e.target.closest('button[data-action]');
     if (!btn) return;
@@ -1218,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', function(){
     deleteTempPoint(parseFloat(btn.dataset.t));
   });
 
-  // 新增風力／新增火力：烘豆過程中隨時新增一筆風力或火力紀錄，輸入框限 1-9，預設帶入目前數值，可用 -/+ 按鈕調整
+  // 新增風速／新增火力：烘豆過程中隨時新增一筆風速或火力紀錄，輸入框限 1-9，預設帶入目前數值，可用 -/+ 按鈕調整
   var adjustType = null;
   function openAdjustPanel(type, label){
     adjustType = type;
@@ -1228,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', function(){
     panel.hidden = false;
     panel.classList.add('capture-panel--active');
   }
-  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風力', '新增風力'); });
+  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風速', '新增風速'); });
   document.getElementById('btnChangePower').addEventListener('click', function(){ openAdjustPanel('火力', '新增火力'); });
 
   document.getElementById('adjustPanelValue').addEventListener('input', function(){
@@ -1341,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', function(){
           return { text: ev ? ev.label : '', crack: !!ev, style: ev ? 'event' : null };
         }) },
       { label: '風速', cells: (function(){
-          var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風力', 20);
+          var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風速', 20);
           return cols.map(function(p, i){ return { text: windMap[i] || '', crack: isCrackCol(p.t) }; });
         })() },
       { label: '火力', cells: (function(){

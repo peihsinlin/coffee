@@ -1,1 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>烘豆小助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="appbar">
+    <span class="appbar__title" id="appbarTitle">烘豆小助手</span>
+    <span class="appbar__subtitle" id="appbarSubtitle" hidden></span>
+  </header>
 
+  <main>
+    <!-- 設定頁 -->
+    <section id="screen-setup" class="screen">
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">生豆資訊</h2></div>
+        <div class="panel__body">
+        <div class="field-grid">
+          <label>烘焙師姓名 <span class="req">＊必填</span>
+            <input type="text" id="roasterName" placeholder="例如：王小明">
+          </label>
+          <label>國家／地區 <span class="req">＊必填</span>
+            <input type="text" id="beanOrigin" placeholder="例如：衣索比亞 耶加雪菲">
+          </label>
+          <label>莊園
+            <input type="text" id="beanFarm" placeholder="選填">
+          </label>
+          <label>公司
+            <input type="text" id="beanCompany" placeholder="選填">
+          </label>
+          <label>品種
+            <input type="text" id="beanVariety" placeholder="例如：藝伎">
+          </label>
+          <label>處理法
+            <input type="text" id="beanProcess" placeholder="例如：水洗">
+          </label>
+          <label>價格／1kg
+            <input type="number" id="beanPrice" placeholder="選填">
+          </label>
+          <label>瑕疵率（%）
+            <input type="number" id="beanDefectRate" placeholder="選填">
+          </label>
+          <label>含水率（%）
+            <input type="number" id="beanMoisture" placeholder="選填">
+          </label>
+          <label>密度
+            <input type="number" id="beanDensity" placeholder="選填">
+          </label>
+          <label class="field-grid__full">備註
+            <input type="text" id="beanNotes" placeholder="選填">
+          </label>
+        </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">烘豆機</h2></div>
+        <div class="panel__body">
+        <label class="field-grid__full">選擇烘豆機
+          <select id="machineSelect" class="field-select">
+            <option value="">請選擇</option>
+            <option value="Mini500">Mini500</option>
+            <option value="FR800">FR800</option>
+            <option value="FR540">FR540</option>
+          </select>
+        </label>
+        <p class="panel__hint">選擇後會顯示「豆量及環境」與「烘焙計劃」；輸入烘前重量會自動帶入烘焙計劃建議值（目前僅 Mini500 有對照表）</p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-session" hidden>
+        <div class="panel__head"><h2 class="panel__title">豆量及環境</h2></div>
+        <div class="panel__body">
+        <div class="field-grid">
+          <label>烘前重量（g） <span class="req">＊必填</span>
+            <input type="number" id="weightBefore" placeholder="例如：300">
+          </label>
+          <label>溫度（°C） <span class="req">＊必填</span>
+            <input type="number" id="sessionTemp" placeholder="例如：25">
+          </label>
+        </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-plan" hidden>
+        <div class="panel__head"><h2 class="panel__title">烘焙計劃</h2></div>
+        <div class="panel__body">
+
+        <div id="planFixedFields">
+        <p class="panel__hint">輸入烘前重量後會自動帶入建議數值，也可以手動調整</p>
+        <div class="field-grid field-grid--3">
+          <label>入豆溫度（°C）
+            <input type="number" id="planChargeTemp" placeholder="—">
+          </label>
+          <label>轉速（rpm）
+            <input type="number" id="sessionRpm" placeholder="—">
+          </label>
+          <label>初始風門
+            <input type="text" id="planDamper000" placeholder="—">
+          </label>
+          <label>回溫點火力
+            <input type="number" id="planPower000" placeholder="—">
+          </label>
+          <label>2:00 火力
+            <input type="number" id="planPower200" placeholder="—">
+          </label>
+          <label>8:00 火力
+            <input type="number" id="planPower800" placeholder="—">
+          </label>
+        </div>
+        </div>
+
+        <div id="planCustomSection" hidden>
+        <h3 class="panel__subtitle">自訂操作提醒</h3>
+        <p class="panel__hint">設定時間點與風速或火力數值，開始烘豆後會用嗶聲與語音提醒</p>
+        <div class="inline-form inline-form--top">
+          <div class="field-grid field-grid--3">
+            <label>時間（分:秒）
+              <div class="time-input">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newPlanEventMin" placeholder="分">
+                <span>:</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newPlanEventSec" placeholder="秒">
+              </div>
+            </label>
+            <label>項目
+              <select id="newPlanEventType" class="field-select">
+                <option value="風速">風速</option>
+                <option value="火力">火力</option>
+              </select>
+            </label>
+            <label>數值（1-9）
+              <input type="text" inputmode="numeric" pattern="[1-9]" maxlength="1" id="newPlanEventValue" placeholder="1-9">
+            </label>
+          </div>
+          <div class="form-error" id="planEventFormError"></div>
+          <button type="button" id="btnAddPlanEvent" class="btn btn--outline btn--sm">新增</button>
+        </div>
+        <div class="plan-custom-lists">
+          <div>
+            <h4 class="list-col-title">風速</h4>
+            <ul id="planEventListWind" class="event-list">
+              <li class="event-list__empty">尚未加入</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="list-col-title">火力</h4>
+            <ul id="planEventListFire" class="event-list">
+              <li class="event-list__empty">尚未加入</li>
+            </ul>
+          </div>
+        </div>
+        </div>
+
+        </div>
+      </div>
+
+      <div class="setup-footer">
+        <button type="button" id="btnStartRoast" class="btn btn--primary btn--block" disabled>開始烘豆</button>
+      </div>
+    </section>
+
+    <!-- 烘豆進行頁 -->
+    <section id="screen-roast" class="screen" hidden>
+      <div class="roast-meta">
+        <span id="roastDate">—</span>
+      </div>
+
+      <div class="timer-face">
+        <div class="timer-face__value" id="timerDisplay">00:00</div>
+        <div class="timer-face__label">已烘焙時間</div>
+      </div>
+      <p class="ror-readout" id="rorReadout">RoR（升溫速率）－</p>
+      <p class="dev-readout" id="devReadout" hidden>發展時間 00:00（0.0%）</p>
+
+      <div class="control-row">
+        <button type="button" id="btnPauseResume" class="btn btn--ghost">暫停</button>
+        <button type="button" id="btnManualTemp" class="btn btn--ghost">手動記溫</button>
+        <button type="button" id="btnEndRoastQuick" class="btn btn--danger">結束烘豆</button>
+      </div>
+
+      <div class="control-row">
+        <button type="button" id="btnChangeFan" class="btn btn--ghost">新增風速</button>
+        <button type="button" id="btnChangePower" class="btn btn--ghost">新增火力</button>
+      </div>
+
+      <div class="crack-btn-row">
+        <button type="button" class="btn btn--sm crack-btn" data-label="一爆起">一爆起</button>
+        <button type="button" class="btn btn--sm crack-btn" data-label="一爆止">一爆止</button>
+        <button type="button" class="btn btn--sm crack-btn" data-label="二爆起">二爆起</button>
+        <button type="button" class="btn btn--sm crack-btn" data-label="二爆止">二爆止</button>
+      </div>
+
+      <div id="tempPrompt" class="capture-panel" hidden>
+        <div class="capture-panel__label" id="tempPromptLabel">請輸入目前溫度</div>
+        <form id="tempPromptForm" class="capture-panel__form">
+          <input type="number" inputmode="decimal" id="tempPromptInput" placeholder="°C" required>
+          <button type="submit" class="btn btn--primary btn--sm">記錄</button>
+        </form>
+      </div>
+
+      <div id="eventConfirmPanel" class="capture-panel" hidden>
+        <div class="capture-panel__label">操作提醒確認（10秒內無動作將自動寫入）</div>
+        <div id="eventConfirmList" class="event-confirm-list"></div>
+      </div>
+
+      <div id="adjustPanel" class="capture-panel" hidden>
+        <div class="capture-panel__label" id="adjustPanelLabel">設定數值</div>
+        <div class="adjust-input-row">
+          <button type="button" id="adjustPanelMinus" class="btn btn--outline btn--sm adjust-step">－</button>
+          <input type="text" inputmode="numeric" pattern="[1-9]" maxlength="1" id="adjustPanelValue" class="adjust-value-input" value="5">
+          <button type="button" id="adjustPanelPlus" class="btn btn--outline btn--sm adjust-step">＋</button>
+        </div>
+        <div class="control-row">
+          <button type="button" id="btnAdjustCancel" class="btn btn--outline">取消</button>
+          <button type="button" id="btnAdjustSubmit" class="btn btn--primary">送出</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">烘焙曲線</h2></div>
+        <div class="panel__body">
+        <canvas id="liveCurve" class="curve-canvas"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">生豆資訊</h2></div>
+        <div class="panel__body panel__body--flush">
+        <table class="bean-info-table">
+          <tbody id="liveBeanInfoBody"></tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">事件時間軸</h2></div>
+        <div class="panel__body panel__body--flush">
+        <div class="table-scroll">
+          <table class="log-table">
+            <tbody id="liveLogTableBody"></tbody>
+          </table>
+        </div>
+        </div>
+      </div>
+
+      <div class="roast-footer">
+        <button type="button" id="btnFinishRoast" class="btn btn--primary btn--block">結束烘豆，查看結果</button>
+      </div>
+    </section>
+
+    <!-- 結果頁 -->
+    <section id="screen-result" class="screen" hidden>
+      <div class="result-summary">
+        <p id="resultMeta">—</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">烘焙摘要</h2></div>
+        <div class="panel__body">
+        <dl class="summary-grid" id="summaryGrid">
+          <div><dt>發展時間</dt><dd id="summaryDevTime">—</dd></div>
+          <div><dt>發展百分比</dt><dd id="summaryDevPercent">—</dd></div>
+        </dl>
+        <dl class="summary-grid">
+          <div><dt>總升溫</dt><dd id="summaryRise">—</dd></div>
+          <div><dt>失重</dt><dd id="summaryLoss">—</dd></div>
+        </dl>
+        <div class="field-grid">
+          <label>烘後重量（g）
+            <input type="number" id="weightAfter" placeholder="例如：258">
+          </label>
+          <label>烘焙度（豆）
+            <input type="number" step="0.1" id="roastLevelBean" placeholder="例如：72.8">
+          </label>
+          <label>烘焙度（粗粉）
+            <input type="number" step="0.1" id="roastLevelCoarse" placeholder="選填">
+          </label>
+          <label>烘焙度（細粉）
+            <input type="number" step="0.1" id="roastLevelFine" placeholder="選填">
+          </label>
+        </div>
+        <dl class="summary-grid">
+          <div><dt>粗粉差</dt><dd id="diffCoarse">—</dd></div>
+          <div><dt>細粉差</dt><dd id="diffFine">—</dd></div>
+        </dl>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__body panel__body--flush">
+        <canvas id="resultCurve" class="curve-canvas curve-canvas--lg"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">生豆資訊</h2></div>
+        <div class="panel__body panel__body--flush">
+        <table class="bean-info-table">
+          <tbody id="resultBeanInfoBody"></tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head"><h2 class="panel__title">事件時間軸</h2></div>
+        <div class="panel__body panel__body--flush">
+        <div class="table-scroll">
+          <table class="log-table">
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+        </div>
+      </div>
+
+      <div class="result-footer">
+        <div class="control-row">
+          <button type="button" id="btnPrintRoast" class="btn btn--outline">列印烘焙紀錄</button>
+          <button type="button" id="btnExportJpg" class="btn btn--primary">匯出成 JPG</button>
+        </div>
+        <button type="button" id="btnNewRoast" class="btn btn--ghost btn--block">開始新的烘焙</button>
+      </div>
+    </section>
+
+    <p class="app-footer-note">C.C.D. 烘豆小助手 手機版</p>
+
+    <!-- 列印專用：白底版烘焙紀錄圖，內容與 JPG 匯出一致，平常隱藏，只在列印時顯示 -->
+    <img id="printExportImage" alt="烘焙紀錄">
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

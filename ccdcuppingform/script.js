@@ -13,28 +13,50 @@ const state = {
   items:[]
 };
 
-let teacherItems = [{ name:'品項1', roast:'' }];
+let teacherItems = [{ name:'品項1', roast:'', baseScore:'80' }];
 
 function makeScores(){
   const s = { aroma:0 };
   CATEGORY_DEFS.forEach(c=>{ s[c.key] = 0; });
   return s;
 }
-function newItemData(name, roast){
-  return { name: (name && name.trim()) ? name.trim() : '品項1', flavorNote:'', agtron: (roast || ''), notes:'', scores: makeScores() };
+function newItemData(name, roast, baseScore){
+  return {
+    name: (name && name.trim()) ? name.trim() : '品項1',
+    flavorNote:'',
+    agtron: (roast || ''),
+    baseScore: (baseScore !== undefined && baseScore !== null && String(baseScore).trim() !== '') ? String(baseScore).trim() : '80',
+    notes:'',
+    scores: makeScores()
+  };
 }
 function itemTotal(item){
-  return 80 + CATEGORY_DEFS.reduce((sum,c)=>sum+item.scores[c.key],0);
+  const base = parseFloat(item.baseScore);
+  const validBase = isNaN(base) ? 80 : base;
+  return validBase + CATEGORY_DEFS.reduce((sum,c)=>sum+item.scores[c.key],0);
+}
+// round to 2dp and drop trailing zeros for display (e.g. 87.5, not 87.50000000000001)
+function formatScore(n){
+  return String(Math.round(n * 100) / 100);
+}
+// 烘焙度輸入限制：只留數字與一個小數點，且小數點後最多 1 位
+function limitToOneDecimal(value){
+  let v = value.replace(/[^0-9.]/g, '');
+  const firstDot = v.indexOf('.');
+  if(firstDot !== -1){
+    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, '').slice(0, 1);
+  }
+  return v;
 }
 
 // =====================================================================
-// 老師端：品項數量 → 動態品項名稱／烘焙度欄位
+// 老師端：品項數量 → 動態品項名稱／烘焙度／起算分欄位
 // =====================================================================
 function applyItemCount(n){
   if(isNaN(n) || n < 1) n = 1;
   if(n > 12) n = 12;
   document.getElementById('in-count').value = n;
-  while(teacherItems.length < n) teacherItems.push({ name:'品項' + (teacherItems.length + 1), roast:'' });
+  while(teacherItems.length < n) teacherItems.push({ name:'品項' + (teacherItems.length + 1), roast:'', baseScore:'80' });
   while(teacherItems.length > n) teacherItems.pop();
   renderTeacherItemFields();
 }
@@ -48,21 +70,31 @@ function renderTeacherItemFields(){
   const container = document.getElementById('teacher-items-container');
   container.innerHTML = '';
   teacherItems.forEach((item, i)=>{
-    const field = document.createElement('div');
-    field.className = 'two-col-row';
-    field.innerHTML = `
-      <div class="field">
-        <label>品項${i+1} 名稱</label>
-        <input type="text" class="teacher-item-name" value="${item.name}" placeholder="例如：品項${i+1}">
-      </div>
-      <div class="field">
-        <label>烘焙度<em>（選填）</em></label>
-        <input type="text" inputmode="numeric" class="teacher-item-roast" value="${item.roast}" placeholder="選填">
+    const wrap = document.createElement('div');
+    wrap.className = 'teacher-item-fields';
+    wrap.innerHTML = `
+      <div class="three-col-row">
+        <div class="field field-name-col">
+          <label>名稱</label>
+          <input type="text" class="teacher-item-name" value="${item.name}" placeholder="例如：品項${i+1}">
+        </div>
+        <div class="field field-roast-col">
+          <label>烘焙度</label>
+          <input type="text" inputmode="decimal" class="teacher-item-roast" value="${item.roast}" placeholder="選填">
+        </div>
+        <div class="field field-base-col">
+          <label>起算分</label>
+          <input type="text" inputmode="decimal" class="teacher-item-base" value="${item.baseScore}" placeholder="80">
+        </div>
       </div>
     `;
-    field.querySelector('.teacher-item-name').addEventListener('input', e=>{ item.name = e.target.value; });
-    field.querySelector('.teacher-item-roast').addEventListener('input', e=>{ item.roast = e.target.value; });
-    container.appendChild(field);
+    wrap.querySelector('.teacher-item-name').addEventListener('input', e=>{ item.name = e.target.value; });
+    wrap.querySelector('.teacher-item-roast').addEventListener('input', e=>{
+      e.target.value = limitToOneDecimal(e.target.value);
+      item.roast = e.target.value;
+    });
+    wrap.querySelector('.teacher-item-base').addEventListener('input', e=>{ item.baseScore = e.target.value; });
+    container.appendChild(wrap);
   });
 }
 
@@ -72,6 +104,8 @@ function renderTeacherItemFields(){
 function buildItemBlock(item, idx){
   const wrap = document.createElement('div');
   wrap.className = 'item-block';
+  wrap.id = 'item-block-' + idx;
+  wrap.dataset.idx = idx;
 
   const fieldsMeta = [
     {key:'aroma', scored:false, label:'乾／濕香', en:'Fragrance / Aroma'},
@@ -94,7 +128,7 @@ function buildItemBlock(item, idx){
     <div class="item-head">
       <span class="item-title">${item.name}</span>
       <div class="item-right">
-        <span class="item-total"><span class="tot-num">80</span><small> 分</small></span>
+        <span class="item-total"><span class="tot-num">${formatScore(itemTotal(item))}</span><small> 分</small></span>
       </div>
     </div>
     <div class="item-body">
@@ -105,7 +139,7 @@ function buildItemBlock(item, idx){
         </div>
         <div class="field">
           <label class="field-label-strong">烘焙度 <em>Agtron</em></label>
-          <input type="text" inputmode="numeric" class="in-agtron" placeholder="選填" value="${item.agtron}">
+          <input type="text" inputmode="decimal" class="in-agtron" placeholder="選填" value="${item.agtron}">
         </div>
       </div>
       ${scoreFieldsHtml}
@@ -117,7 +151,10 @@ function buildItemBlock(item, idx){
   `;
 
   wrap.querySelector('.in-flavor-note').addEventListener('input', e=>{ item.flavorNote = e.target.value; });
-  wrap.querySelector('.in-agtron').addEventListener('input', e=>{ item.agtron = e.target.value; });
+  wrap.querySelector('.in-agtron').addEventListener('input', e=>{
+    e.target.value = limitToOneDecimal(e.target.value);
+    item.agtron = e.target.value;
+  });
   wrap.querySelector('.in-item-notes').addEventListener('input', e=>{ item.notes = e.target.value; });
 
   wrap.querySelectorAll('.score-field').forEach(field=>{
@@ -134,7 +171,7 @@ function buildItemBlock(item, idx){
         if(v>0) b.classList.add('pos');
         if(v<0) b.classList.add('neg');
         item.scores[key] = v;
-        wrap.querySelector('.tot-num').textContent = itemTotal(item);
+        wrap.querySelector('.tot-num').textContent = formatScore(itemTotal(item));
       });
       ticksEl.appendChild(b);
     });
@@ -149,6 +186,52 @@ function renderAllItems(){
   state.items.forEach((item, idx)=>{
     container.appendChild(buildItemBlock(item, idx));
   });
+  renderItemJumpNav();
+  setupItemJumpObserver();
+}
+
+// ---- floating quick-jump nav: tap a number to scroll straight to that item ----
+function renderItemJumpNav(){
+  const nav = document.getElementById('item-jump-nav');
+  if(!nav) return;
+  nav.innerHTML = '';
+  if(state.items.length <= 1){
+    nav.style.display = 'none';
+    return;
+  }
+  nav.style.display = 'flex';
+  state.items.forEach((item, idx)=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'item-jump-btn';
+    b.textContent = String(idx+1);
+    b.dataset.idx = idx;
+    b.setAttribute('aria-label', '跳至 ' + item.name);
+    b.addEventListener('click', ()=>{
+      const target = document.getElementById('item-block-' + idx);
+      if(target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+    });
+    nav.appendChild(b);
+  });
+}
+
+// highlights the jump-nav button for whichever item is currently in view
+let itemJumpObserver = null;
+function setupItemJumpObserver(){
+  if(itemJumpObserver){ itemJumpObserver.disconnect(); itemJumpObserver = null; }
+  if(!window.IntersectionObserver) return;
+  const blocks = document.querySelectorAll('.item-block');
+  if(!blocks.length) return;
+  itemJumpObserver = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting) return;
+      const idx = entry.target.dataset.idx;
+      document.querySelectorAll('.item-jump-btn').forEach(b=>b.classList.remove('active'));
+      const btn = document.querySelector('.item-jump-btn[data-idx="' + idx + '"]');
+      if(btn) btn.classList.add('active');
+    });
+  }, { root:null, rootMargin:'-35% 0px -50% 0px', threshold:0 });
+  blocks.forEach(b=>itemJumpObserver.observe(b));
 }
 
 // ---- view switching ----
@@ -170,11 +253,12 @@ function createSession(){
   }
   const items = teacherItems.map((it,i)=> ({
     n: (it.name && it.name.trim()) ? it.name.trim() : ('品項' + (i+1)),
-    r: (it.roast || '').trim()
+    r: (it.roast || '').trim(),
+    b: (it.baseScore !== undefined && String(it.baseScore).trim() !== '') ? String(it.baseScore).trim() : '80'
   }));
 
   state.topic = topic;
-  state.items = items.map(it => newItemData(it.n, it.r));
+  state.items = items.map(it => newItemData(it.n, it.r, it.b));
 
   document.getElementById('qr-topic-text').textContent = topic;
 
@@ -228,7 +312,7 @@ async function copyScoreLink(){
 
 // ---- QR 頁：同裝置直接進入評分頁（免掃碼） ----
 function goToScoreDirect(){
-  document.getElementById('score-topic-echo').textContent = state.topic;
+  document.getElementById('score-topic-input').value = state.topic;
   renderAllItems();
   goView('view-score');
 }
@@ -249,6 +333,8 @@ function submitScore(){
     return;
   }
   state.name = document.getElementById('in-name').value.trim();
+  const topicVal = document.getElementById('score-topic-input').value.trim();
+  if(topicVal) state.topic = topicVal;
 
   renderResult();
   goView('view-result');
@@ -297,7 +383,7 @@ function renderResult(){
       <td class="flavor-note">${item.flavorNote ? item.flavorNote : '—'}</td>
       <td class="num ${aromaCls}">${aromaV>0?'+':''}${aromaV}</td>
       ${scoredCells}
-      <td class="total">${total}</td>
+      <td class="total">${formatScore(total)}</td>
       <td class="flavor-note">${item.notes ? item.notes : '—'}</td>
     `;
     tbody.appendChild(tr);
@@ -456,20 +542,26 @@ window.addEventListener('beforeunload', function(e){
 
   if(topic){
     state.topic = topic;
-    let items = [{ n:'品項1', r:'' }];
+    let items = [{ n:'品項1', r:'', b:'80' }];
     if(itemsParam){
       try {
         const parsed = JSON.parse(itemsParam);
         if(Array.isArray(parsed) && parsed.length){
-          // support both the current {n, r} format and older plain-string links
-          items = parsed.map((it, i) => (typeof it === 'string')
-            ? { n: it, r:'' }
-            : { n: it.n || ('品項' + (i+1)), r: it.r || '' });
+          // support the current {n, r, b} format, the older {n, r} format,
+          // and even older plain-string links
+          items = parsed.map((it, i) => {
+            if(typeof it === 'string') return { n: it, r:'', b:'80' };
+            return {
+              n: it.n || ('品項' + (i+1)),
+              r: it.r || '',
+              b: (it.b !== undefined && String(it.b).trim() !== '') ? String(it.b).trim() : '80'
+            };
+          });
         }
       } catch(e){ /* fall back to default */ }
     }
-    state.items = items.map(it => newItemData(it.n, it.r));
-    document.getElementById('score-topic-echo').textContent = topic;
+    state.items = items.map(it => newItemData(it.n, it.r, it.b));
+    document.getElementById('score-topic-input').value = topic;
     renderAllItems();
     goView('view-score');
   } else {

@@ -88,11 +88,13 @@
   <div class="view" id="view-score">
     <div class="brand">
       <p class="kicker">C.C.D. 杯測表手機版 · 第五波 精品咖啡 80以上+++</p>
-      <h1>杯測評分表</h1>
-      <h1 class="topic-line" id="score-topic-echo">—</h1>
     </div>
 
     <div class="card">
+      <div class="field" id="field-topic">
+        <label for="score-topic-input">本次主題</label>
+        <input type="text" id="score-topic-input" placeholder="本次主題" value="">
+      </div>
       <div class="field" id="field-name">
         <label for="in-name">姓名 / 暱稱</label>
         <input type="text" id="in-name" placeholder="">
@@ -103,6 +105,8 @@
     </div>
 
     <button class="btn btn-primary" style="margin-top:14px;" onclick="submitScore()">完成評分，產生結果表 →</button>
+
+    <div class="item-jump-nav" id="item-jump-nav" aria-label="快速跳至品項"></div>
   </div>
 
   <!-- ============ VIEW 4 : 結果（橫式總表） ============ -->

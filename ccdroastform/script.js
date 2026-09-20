@@ -89,6 +89,75 @@ function renderPlanEventList(){
   renderList('planEventListFire', fire);
 }
 
+// ---------- 烘焙計劃預設曲線（Fresh Roast SR540／SR800）----------
+// 每筆用 [秒數, 數值] 表示，匯入時會轉成跟手動新增一樣的 state.planEvents 項目
+var ROAST_PLAN_PRESETS = {
+  SR540: [
+    {
+      id: 'sr540-slow', label: 'SR540 慢烘淺焙',
+      wind: [[0, 9], [120, 7], [180, 6], [240, 5]],
+      fire: [[0, 2], [120, 4], [180, 5], [240, 6], [300, 7]]
+    },
+    {
+      id: 'sr540-medium', label: 'SR540 中焙',
+      wind: [[0, 9], [120, 7], [180, 6], [240, 5]],
+      fire: [[0, 3], [120, 4], [180, 5], [240, 6], [300, 7], [360, 8], [420, 9]]
+    },
+    {
+      id: 'sr540-fast', label: 'SR540 快烘深焙',
+      wind: [[0, 9], [120, 7], [180, 6], [240, 5]],
+      fire: [[0, 6], [240, 7], [300, 8]]
+    }
+  ],
+  SR800: [
+    {
+      id: 'sr800-slow', label: 'SR800 慢烘淺焙',
+      wind: [[0, 9], [120, 7], [240, 6], [360, 5]],
+      fire: [[0, 1], [120, 3], [180, 4], [240, 5], [300, 6], [360, 7], [420, 8], [480, 9]]
+    },
+    {
+      id: 'sr800-medium', label: 'SR800 中焙',
+      wind: [[0, 9], [120, 7], [240, 6], [360, 5]],
+      fire: [[0, 3], [120, 4], [180, 5], [240, 6], [300, 7], [360, 8], [420, 9]]
+    },
+    {
+      id: 'sr800-fast', label: 'SR800 快烘深焙',
+      wind: [[0, 9], [120, 7], [240, 6], [360, 5], [420, 4]],
+      fire: [[0, 6], [240, 7], [300, 8], [360, 9]]
+    }
+  ]
+};
+
+// 依目前選擇的烘豆機，把對應的預設烘焙計劃列進下拉選單；不是 SR540／SR800 就清空
+function renderPlanPresetOptions(){
+  var select = document.getElementById('planPresetSelect');
+  if (!select) return;
+  var machine = document.getElementById('machineSelect').value;
+  var presets = ROAST_PLAN_PRESETS[machine] || [];
+  select.innerHTML = '<option value="">請選擇</option>' +
+    presets.map(function(p){ return '<option value="' + p.id + '">' + escapeHtml(p.label) + '</option>'; }).join('');
+}
+
+// 匯入預設烘焙計劃：取代目前所有的風速／火力提醒
+function importPlanPreset(presetId){
+  var machine = document.getElementById('machineSelect').value;
+  var presets = ROAST_PLAN_PRESETS[machine] || [];
+  var preset = presets.find(function(p){ return p.id === presetId; });
+  if (!preset) return;
+  if (state.planEvents.length > 0){
+    if (!window.confirm('匯入「' + preset.label + '」會取代目前已設定的風速／火力提醒，確定要繼續嗎？')) return;
+  }
+  var events = [];
+  preset.wind.forEach(function(pair){
+    events.push({ id: uid(), seconds: pair[0], type: '風速', value: String(pair[1]) });
+  });
+  preset.fire.forEach(function(pair){
+    events.push({ id: uid(), seconds: pair[0], type: '火力', value: String(pair[1]) });
+  });
+  state.planEvents = events;
+  renderPlanEventList();
+}
+
 // ---------- 烘焙計劃：目前僅 Mini500 有對照表，依烘前重量自動帶入建議值 ----------
 function getRoastPlan(weight){
   if (weight <= 225)  return { chargeTemp:130, damper000:'右2', power000:4, power200:6, power800:4, rpm:55 };
@@ -733,8 +802,22 @@ function findEventByKeyword(triggeredLog, keyword){
   return matches.reduce(function(a, b){ return a.t < b.t ? a : b; });
 }
 
+// 曲線下面積（梯形法積分溫度對時間），當作「總熱能」的相對比較指標：
+// 面積越大代表整段烘焙過程中溫度（豆溫）累積得越高／越久，可以用來比較不同烘焙之間的熱量差異，
+// 單位是 °C·分（溫度乘以時間），不是實際物理熱力學上的焦耳，只是一個方便比較的相對數值
+function computeThermalEnergy(tempLog){
+  var pts = (tempLog || []).slice().sort(function(a, b){ return a.t - b.t; });
+  if (pts.length < 2) return null;
+  var area = 0;
+  for (var i = 1; i < pts.length; i++){
+    var dt = pts[i].t - pts[i - 1].t;
+    area += dt * (pts[i].temp + pts[i - 1].temp) / 2;
+  }
+  return area / 60; // 秒轉分鐘，單位變成 °C·分
+}
+
 function computeSummary(){
-  var summary = { dtrText: '—', devTimeText: '—', devPercentText: '—', riseText: '—', lossText: '—' };
+  var summary = { dtrText: '—', devTimeText: '—', devPercentText: '—', riseText: '—', lossText: '—', energyText: '—' };
   if (!roast) return summary;
 
   // 發展時間比 DTR = (結束時間 - 一爆開始時間) / 結束時間，拆成「發展時間」「發展百分比」兩個獨立數值顯示
@@ -763,6 +846,12 @@ function computeSummary(){
   if (roast.weightBefore && !isNaN(weightAfter) && weightAfter > 0){
     var loss = ((roast.weightBefore - weightAfter) / roast.weightBefore) * 100;
     summary.lossText = loss.toFixed(1) + '%';
+  }
+
+  // 總熱能：溫度曲線下面積
+  var energy = computeThermalEnergy(roast.tempLog);
+  if (energy != null){
+    summary.energyText = energy.toFixed(0) + ' °C·分';
   }
 
   return summary;
@@ -955,6 +1044,7 @@ function renderSummary(){
   document.getElementById('summaryDevPercent').textContent = s.devPercentText;
   document.getElementById('summaryRise').textContent = s.riseText;
   document.getElementById('summaryLoss').textContent = s.lossText;
+  document.getElementById('summaryEnergy').textContent = s.energyText;
   return s;
 }
 
@@ -1046,6 +1136,7 @@ document.addEventListener('DOMContentLoaded', function(){
     document.getElementById('panel-plan').hidden = !selected;
     document.getElementById('planFixedFields').hidden = !isMini;
     document.getElementById('planCustomSection').hidden = !(selected && !isMini);
+    renderPlanPresetOptions();
     updateStartButton();
     applyRoastPlan();
   });
@@ -1067,6 +1158,13 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('newPlanEventValue').addEventListener('input', function(){
     var digits = this.value.replace(/[^1-9]/g, '');
     this.value = digits.slice(-1);
+  });
+
+  // 匯入預設烘焙計劃
+  document.getElementById('btnImportPlanPreset').addEventListener('click', function(){
+    var presetId = document.getElementById('planPresetSelect').value;
+    if (!presetId) return;
+    importPlanPreset(presetId);
   });
 
   // 新增自訂操作提醒

@@ -97,8 +97,8 @@
           <select id="machineSelect" class="field-select">
             <option value="">請選擇</option>
             <option value="Mini500">Mini500</option>
-            <option value="FR800">FR800</option>
-            <option value="FR540">FR540</option>
+            <option value="SR800">Fresh Roast SR800</option>
+            <option value="SR540">Fresh Roast SR540</option>
           </select>
         </label>
         <p class="panel__hint">選擇後會顯示「豆量及環境」與「烘焙計劃」；輸入烘前重量會自動帶入烘焙計劃建議值（目前僅 Mini500 有對照表）</p>
@@ -148,6 +148,19 @@
         </div>
 
         <div id="planCustomSection" hidden>
+        <div id="planImportSection">
+        <h3 class="panel__subtitle">匯入烘焙計劃</h3>
+        <p class="panel__hint">選擇下方預設曲線，會自動帶入風速／火力提醒（會取代目前已設定的提醒）</p>
+        <div class="inline-form inline-form--top">
+          <label class="field-grid__full">烘焙計劃
+            <select id="planPresetSelect" class="field-select">
+              <option value="">請選擇</option>
+            </select>
+          </label>
+          <button type="button" id="btnImportPlanPreset" class="btn btn--outline btn--sm">匯入</button>
+        </div>
+        </div>
+
         <h3 class="panel__subtitle">自訂操作提醒</h3>
         <p class="panel__hint">設定時間點與風速或火力數值，開始烘豆後會用嗶聲與語音提醒</p>
         <div class="inline-form inline-form--top">
@@ -301,6 +314,9 @@
         <dl class="summary-grid">
           <div><dt>總升溫</dt><dd id="summaryRise">—</dd></div>
           <div><dt>失重</dt><dd id="summaryLoss">—</dd></div>
+        </dl>
+        <dl class="summary-grid">
+          <div><dt>總熱能</dt><dd id="summaryEnergy">—</dd></div>
         </dl>
         <div class="field-grid">
           <label>烘後重量（g）

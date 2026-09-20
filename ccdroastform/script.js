@@ -1425,8 +1425,8 @@ document.addEventListener('DOMContentLoaded', function(){
     panel.hidden = false;
     panel.classList.add('capture-panel--active');
   }
-  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風速', '新增風速'); });
-  document.getElementById('btnChangePower').addEventListener('click', function(){ openAdjustPanel('火力', '新增火力'); });
+  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風速', '調整風速'); });
+  document.getElementById('btnChangePower').addEventListener('click', function(){ openAdjustPanel('火力', '調整火力'); });
 
   document.getElementById('adjustPanelValue').addEventListener('input', function(){
     var el = document.getElementById('adjustPanelValue');

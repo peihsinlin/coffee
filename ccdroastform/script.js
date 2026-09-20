@@ -409,11 +409,9 @@ function hasFanPowerEvents(triggeredLog){
 
 // 風速／火力階梯圖，畫在主曲線下方，藍色F=風速、橘色P=火力，仿照烘豆機軟體常見畫法
 // 風速／火力階梯圖：F、P 共用同一個數值刻度，數值相同時線會交叉，畫法參考烘豆機軟體常見樣式
-function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
-  var allVals = fanItems.concat(powerItems)
-    .map(function(it){ var v = parseFloat(it.value); return isNaN(v) ? null : v; })
-    .filter(function(v){ return v != null; });
-  var vMax = allVals.length ? Math.max.apply(null, allVals.concat([1])) : 1;
+function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems, gridColor){
+  // 風速／火力數值固定是 1-9，直接用 1-9 當作縮放範圍，這樣格線才會跟數值對得上
+  var vMax = 9;
   var vMin = 0;
   var padTop = 14, padBottom = 14;
   var plotTop = yTop + padTop, plotBottom = yTop + bandH - padBottom;
@@ -422,6 +420,14 @@ function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
     if (v == null) return (plotTop + plotBottom) / 2;
     var clamped = Math.max(vMin, Math.min(vMax, v));
     return plotBottom - (clamped - vMin) / (vMax - vMin || 1) * (plotBottom - plotTop);
+  }
+
+  // 1-9 淺灰色網格，方便對照風速／火力數值
+  ctx.strokeStyle = gridColor || 'rgba(42,33,27,0.12)';
+  ctx.lineWidth = 1;
+  for (var gv = 1; gv <= 9; gv++){
+    var gy = yFor(gv);
+    ctx.beginPath(); ctx.moveTo(x0, gy); ctx.lineTo(x0 + w, gy); ctx.stroke();
   }
 
   function drawLine(items, color){
@@ -452,7 +458,7 @@ function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
       var tw = ctx.measureText(text).width;
       var bw = tw + 8, bh = 13;
       var bx = Math.max(x0, Math.min(x0 + w - bw, x - bw / 2));
-      var by = Math.max(yTop + 1, Math.min(yTop + bandH - bh - 1, y - bh - 3));
+      var by = Math.max(plotTop + 1, Math.min(yTop + bandH - bh - 1, y - bh - 3));
       ctx.fillStyle = color;
       if (ctx.roundRect){ ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill(); }
       else { ctx.fillRect(bx, by, bw, bh); }
@@ -688,7 +694,7 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
       .map(function(ev){ return { t: ev.t, value: ev.label.replace('風速 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
     var powerItems = triggeredLog.filter(function(ev){ return ev.label.indexOf('火力') === 0; })
       .map(function(ev){ return { t: ev.t, value: ev.label.replace('火力 ', '') }; }).sort(function(a,b){ return a.t - b.t; });
-    drawStepChart(ctx, x0 + padL, stepTop, w - padL - padR, stepBandH, xScale, fanItems, powerItems);
+    drawStepChart(ctx, x0 + padL, stepTop, w - padL - padR, stepBandH, xScale, fanItems, powerItems, th.gridLine);
   }
 }
 
@@ -716,10 +722,16 @@ function showTempPrompt(auto, crackLabel){
   var panel = document.getElementById('tempPrompt');
   var label = crackLabel ? ('請輸入「' + crackLabel + '」溫度') : (auto ? '請輸入目前溫度' : '手動記溫');
   document.getElementById('tempPromptLabel').textContent = label;
-  document.getElementById('tempPromptInput').value = '';
+  var input = document.getElementById('tempPromptInput');
+  input.value = '';
   panel.hidden = false;
   panel.classList.add('capture-panel--active');
-  document.getElementById('tempPromptInput').focus();
+  // 用 requestAnimationFrame 等面板真的顯示、版面更新完再 focus，
+  // 避免剛切換 hidden 的當下某些手機瀏覽器 focus 不會生效，游標沒有真的跳進輸入欄位
+  requestAnimationFrame(function(){
+    input.focus();
+    if (typeof input.select === 'function') input.select();
+  });
 }
 function hideTempPrompt(){
   var panel = document.getElementById('tempPrompt');

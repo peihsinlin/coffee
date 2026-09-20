@@ -138,6 +138,8 @@ label > *:not(:first-child){ margin-top:6px; }
 .btn--danger{ background:var(--clay); color:#fff; }
 .btn--sm{ padding:9px 14px; font-size:13.5px; width:auto; }
 .btn--block{ width:100%; }
+/* 列印按鈕原本是深色外框（跟畫面底色太接近不易辨識），單獨改成亮銅色以提升對比 */
+#btnPrintRoast{ color:var(--copper); border-color:var(--copper); }
 
 .chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
 .chip{ background:var(--parchment-deep); border:1px solid var(--line); color:var(--ink); font-size:12px; font-weight:600; padding:8px 12px; border-radius:var(--radius-sm); }
@@ -222,11 +224,16 @@ label > *:not(:first-child){ margin-top:6px; }
 
 #printExportImage{ display:none; }
 @media print{
-  html, body{ background:#fff; }
+  /* 橫式 A4、盡量縮小邊界，讓烘焙紀錄圖可以完整印在同一頁內 */
+  @page{ size: A4 landscape; margin: 8mm; }
+  html, body{ background:#fff; min-height:0; }
   /* 列印時只顯示白底版烘焙紀錄圖（#printExportImage），畫面上的深色面板全部隱藏 */
   .appbar, .setup-footer, .roast-footer, .result-footer, #screen-setup, #screen-roast, .app-footer-note, .iab-overlay{ display:none !important; }
   #screen-result > *{ display:none !important; }
-  .app{ max-width:none; padding:0; }
-  main{ padding:0; }
-  #printExportImage{ display:block !important; width:100%; height:auto; }
+  /* .app／main 原本用 min-height:100vh 撐滿手機畫面，列印時要拿掉，
+     不然畫面上方會空出一整頁的高度，把圖片擠到第二頁去 */
+  .app{ max-width:none; min-height:0; padding:0; }
+  main{ min-height:0; padding:0; gap:0; }
+  /* 圖片依比例縮放，同時限制寬高在單一頁面範圍內（100vh 在列印時對應單頁高度） */
+  #printExportImage{ display:block !important; width:auto; height:auto; max-width:100%; max-height:100vh; margin:0 auto; }
 }

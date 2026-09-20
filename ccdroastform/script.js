@@ -470,19 +470,21 @@ function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems){
   // 左側小圖例
   ctx.font = 'bold 9px monospace';
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#3E6B8A'; ctx.fillText('F 風速', x0, yTop - 2);
-  ctx.fillStyle = '#BD6B2E'; ctx.fillText('P 火力', x0 + 44, yTop - 2);
+  ctx.fillStyle = '#3E6B8A'; ctx.fillText('F 風速', x0, yTop + 4);
+  ctx.fillStyle = '#BD6B2E'; ctx.fillText('P 火力', x0 + 44, yTop + 4);
 }
 
 // 圖表配色主題：dark 是原本畫面／JPG匯出用的深色版，light 是白底版（供列印使用）
 var CHART_THEMES = {
   dark: {
     bg: '#241712', border: 'rgba(243,232,211,0.14)', gridLine: 'rgba(243,232,211,0.08)',
-    axisText: '#c9b693', labelText: '#F3E9D8', legendText: '#F3E9D8', placeholderText: '#c9b693'
+    axisText: '#c9b693', labelText: '#F3E9D8', legendText: '#F3E9D8', placeholderText: '#c9b693',
+    bandDry: 'rgba(139,195,74,0.16)', bandMaillard: 'rgba(255,202,58,0.16)', bandDevelopment: 'rgba(224,102,102,0.18)'
   },
   light: {
     bg: '#ffffff', border: 'rgba(42,33,27,0.20)', gridLine: 'rgba(42,33,27,0.12)',
-    axisText: '#6B5D4F', labelText: '#2A211B', legendText: '#2A211B', placeholderText: '#8a7a68'
+    axisText: '#6B5D4F', labelText: '#2A211B', legendText: '#2A211B', placeholderText: '#8a7a68',
+    bandDry: 'rgba(139,195,74,0.22)', bandMaillard: 'rgba(255,202,58,0.22)', bandDevelopment: 'rgba(224,102,102,0.20)'
   }
 };
 
@@ -512,12 +514,39 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   var allT = tempLog.map(function(p){ return p.t; }).concat(triggeredLog.map(function(e){ return e.t; }));
   var maxT = Math.max.apply(null, allT.concat([60]));
   var temps = tempLog.map(function(p){ return p.temp; });
-  var maxTemp = Math.max.apply(null, temps.concat([220]));
+  var maxTemp = Math.max.apply(null, temps.concat([250]));
   var minTemp = Math.min.apply(null, temps.concat([0]));
   if (maxTemp === minTemp) maxTemp = minTemp + 50;
 
   function xScale(t){ return x0 + padL + (t / maxT) * plotW; }
   function yScale(temp){ return y0 + padT + (1 - (temp - minTemp) / (maxTemp - minTemp)) * plotH; }
+
+  // 烘焙階段背景色：155°C以下為「乾燥期」淡綠、155°C至一爆起為「梅納期」淺黃、一爆起以上為「發展期」淺紅
+  // 尚未記錄一爆起時，梅納期的淺黃背景先延伸到圖表頂端（還不知道發展期從哪裡開始）
+  var dryEnd = 155;
+  var firstCrack = findEventByKeyword(crackEvents || [], '一爆');
+  var developmentStart = firstCrack ? firstCrack.temp : null;
+  function fillTempBand(tLo, tHi, color){
+    var lo = Math.max(minTemp, tLo);
+    var hi = Math.min(maxTemp, tHi);
+    if (hi <= lo) return;
+    var yTop = yScale(hi);
+    var yBottom = yScale(lo);
+    ctx.fillStyle = color;
+    ctx.fillRect(x0 + padL, yTop, plotW, yBottom - yTop);
+  }
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0 + padL, y0 + padT, plotW, plotH);
+  ctx.clip();
+  fillTempBand(-Infinity, dryEnd, th.bandDry);
+  if (developmentStart != null){
+    fillTempBand(dryEnd, developmentStart, th.bandMaillard);
+    fillTempBand(developmentStart, Infinity, th.bandDevelopment);
+  } else {
+    fillTempBand(dryEnd, Infinity, th.bandMaillard);
+  }
+  ctx.restore();
 
   // 溫度格線（左軸）
   ctx.strokeStyle = th.gridLine;
@@ -578,41 +607,43 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   // 依時間排序後，不同事件錯開標註：第一個（通常是一爆起）在上方、下一個在下方，依序交錯，避免相鄰事件重疊；
   // 若同一側仍有時間太接近的事件，再逐層外推位置（往左、往外加大間距）
   var sortedEvents = (crackEvents || []).slice().sort(function(a, b){ return a.t - b.t; });
-  var collisionThreshold = 65; // px，小於此距離視為時間接近
-  var lastXBySide = { below: null, above: null };
-  var levelBySide = { below: 0, above: 0 };
+  var collisionThreshold = 80; // px，小於此距離視為時間接近
+  // 不論標籤在上方還是下方，只要跟前一個事件的 x 位置太接近，都要往外再多拉開一層，
+  // 避免像一爆止／結束烘豆這種一個上一個下、但時間點很接近的事件，標籤仍然擠在一起
+  var lastX = null;
+  var globalLevel = 0;
   sortedEvents.forEach(function(ev, idx){
     var side = (idx % 2 === 0) ? 'above' : 'below';
     ev._side = side;
     var x = xScale(ev.t);
-    if (lastXBySide[side] !== null && Math.abs(x - lastXBySide[side]) < collisionThreshold){
-      levelBySide[side]++;
+    if (lastX !== null && Math.abs(x - lastX) < collisionThreshold){
+      globalLevel++;
     } else {
-      levelBySide[side] = 0;
+      globalLevel = 0;
     }
-    ev._labelLevel = levelBySide[side];
-    lastXBySide[side] = x;
+    ev._labelLevel = globalLevel;
+    lastX = x;
   });
 
-  var lineGap = 11; // 兩行文字緊靠，避免佔用太多畫面
+  var lineGap = 12; // 兩行文字的行距
   sortedEvents.forEach(function(ev){
     var x = xScale(ev.t);
     var y = yScale(ev.temp);
     var lvl = ev._labelLevel || 0;
-    var extraGap = lvl * 22;
-    var extraShift = lvl * 42;
+    var extraGap = lvl * 30;
+    var extraShift = lvl * 56;
     var minY = y0 + padT + 4;
     var maxY = y0 + mainH - padB - 4 - lineGap;
     var line1Y, line2Y;
     if (ev._side === 'below'){
-      line1Y = Math.max(minY, Math.min(maxY, y + 18 + extraGap));
+      line1Y = Math.max(minY, Math.min(maxY, y + 26 + extraGap));
       line2Y = line1Y + lineGap;
     } else {
-      line2Y = Math.max(minY + lineGap, Math.min(maxY + lineGap, y - 12 - extraGap));
+      line2Y = Math.max(minY + lineGap, Math.min(maxY + lineGap, y - 20 - extraGap));
       line1Y = line2Y - lineGap;
     }
-    var labelX = x - 12 - extraShift;
-    var textX = x - 15 - extraShift;
+    var labelX = x - 22 - extraShift;
+    var textX = Math.max(x0 + padL + 30, x - 25 - extraShift);
 
     ctx.strokeStyle = '#BD6B2E';
     ctx.lineWidth = 1;
@@ -667,7 +698,7 @@ function drawLiveCurve(){
   var stepBandH = hasFP ? 90 : 0;
   canvas.style.height = (180 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents);
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light');
   renderBeanInfoTable('liveBeanInfoBody');
   renderLogTable('liveLogTableBody');
 }
@@ -677,7 +708,7 @@ function drawResultCurve(){
   var stepBandH = hasFP ? 100 : 0;
   canvas.style.height = (260 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents);
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light');
 }
 
 // ---------- 溫度輸入面板 ----------
@@ -813,6 +844,11 @@ function computeThermalEnergy(tempLog){
     var dt = pts[i].t - pts[i - 1].t;
     area += dt * (pts[i].temp + pts[i - 1].temp) / 2;
   }
+  // 扣除入豆溫度（0:00 起始溫度）以下的矩形面積，只算「超出入豆溫度」的部分，
+  // 避免每次烘焙起始溫度不同時，這段基準值把總熱能的數字灌高、失去比較意義
+  var chargeTemp = pts[0].temp;
+  var totalT = pts[pts.length - 1].t - pts[0].t;
+  area -= chargeTemp * totalT;
   return area / 60; // 秒轉分鐘，單位變成 °C·分
 }
 
@@ -1658,7 +1694,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var beanParts = [gb.origin, gb.farm, gb.variety, gb.process].filter(function(v){ return v; });
     var line1Text = (beanParts.length ? beanParts.join(' · ') + ' ' : '') + '烘焙紀錄';
     var line2Text = '烘豆機：' + roast.machineName + '　烘豆師：' + ((roast.session && roast.session.roasterName) || '—') + '　烘豆時間：' + roast.dateStr;
-    var line3Text = '總時間 ' + formatTime(roast.elapsed) + '　DTR ' + summary.dtrText + '　總升溫 ' + summary.riseText + '　失重 ' + summary.lossText;
+    var line3Text = '總時間 ' + formatTime(roast.elapsed) + '　DTR ' + summary.dtrText + '　總升溫 ' + summary.riseText + '　總熱能 ' + summary.energyText + '　失重 ' + summary.lossText;
     var weightAfterVal = document.getElementById('weightAfter').value;
     var levelBean = document.getElementById('roastLevelBean').value;
     var levelCoarse = document.getElementById('roastLevelCoarse').value;
@@ -1732,7 +1768,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   document.getElementById('btnExportJpg').addEventListener('click', function(){
     if (!roast) return;
-    var canvas = buildRoastCanvas('dark');
+    var canvas = buildRoastCanvas('light');
 
     canvas.toBlob(function(blob){
       var dateStr = new Date().toISOString().slice(0, 10);

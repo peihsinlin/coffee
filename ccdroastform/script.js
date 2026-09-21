@@ -2327,3 +2327,10 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!document.getElementById('screen-result').hidden) drawResultCurve();
   });
 });
+
+// ---------- PWA：註冊 service worker（負責離線快取），失敗也不影響一般網頁使用 ----------
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('service-worker.js').catch(function(){});
+  });
+}

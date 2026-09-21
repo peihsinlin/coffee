@@ -819,6 +819,9 @@ function showTempPrompt(auto, crackLabel){
   input.value = '';
   panel.hidden = false;
   panel.classList.add('capture-panel--active');
+  // 記錄「彈出當下」的累計秒數，送出時一律用這個時間點，不用送出當下的時間，
+  // 避免打字／猶豫太久導致實際記錄的時間點被延後
+  if (roast) roast.pendingPromptElapsed = roast.elapsed;
   // 用 requestAnimationFrame 等面板真的顯示、版面更新完再 focus，
   // 避免剛切換 hidden 的當下某些手機瀏覽器 focus 不會生效，游標沒有真的跳進輸入欄位
   requestAnimationFrame(function(){
@@ -1702,7 +1705,7 @@ document.addEventListener('DOMContentLoaded', function(){
     // 提醒範本（miniScheduleTemplate）到這一刻才正式依新的 0:00 排入排程，2:00／8:00 火力等都是
     // 從這裡開始重新算起
     if (roast.pendingCrackLabel === '回溫點'){
-      var tpT = roast.elapsed;
+      var tpT = (roast.pendingPromptElapsed != null) ? roast.pendingPromptElapsed : roast.elapsed;
       roast.tempLog.push({ t: tpT, temp: val });
       roast.crackEvents.push({ t: tpT, label: '回溫點', temp: val });
 
@@ -1739,7 +1742,7 @@ document.addEventListener('DOMContentLoaded', function(){
       return;
     }
 
-    var elapsed = roast.elapsed;
+    var elapsed = (roast.pendingPromptElapsed != null) ? roast.pendingPromptElapsed : roast.elapsed;
     roast.tempLog.push({ t: elapsed, temp: val });
     if (roast.pendingCrackLabel){
       var crackLabel = roast.pendingCrackLabel;
@@ -1765,6 +1768,18 @@ document.addEventListener('DOMContentLoaded', function(){
         roast.pending30Mark = false;
         showTempPrompt(true);
       }
+    }
+  });
+
+  // 取消記錄溫度：不寫入任何紀錄，直接關閉輸入欄位；如果背後還排著一筆30秒自動提醒，跟送出時一樣接著補顯示
+  document.getElementById('btnTempPromptCancel').addEventListener('click', function(){
+    if (!roast){ hideTempPrompt(); return; }
+    roast.pendingCrackLabel = null;
+    roast.pendingFinish = false;
+    hideTempPrompt();
+    if (roast.pending30Mark){
+      roast.pending30Mark = false;
+      showTempPrompt(true);
     }
   });
 

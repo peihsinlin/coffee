@@ -183,6 +183,10 @@ label > *:not(:first-child){ margin-top:6px; }
 .crack-btn-row{ display:flex; flex-wrap:wrap; gap:6px; }
 .crack-btn{ flex:1 1 21%; min-width:60px; padding:9px 4px; font-size:12px; background:rgba(189,107,46,0.22); border:1px solid var(--copper); color:var(--parchment); }
 .crack-btn:disabled{ background:transparent; border-color:rgba(233,217,190,.18); color:rgba(233,217,190,.3); cursor:not-allowed; }
+/* .btn 的 display:inline-flex 跟瀏覽器對 [hidden] 屬性預設的 display:none 特異度相同，
+   後面載入的 .btn 規則會蓋掉 [hidden]，導致 JS 設定的 btn.hidden=true 沒有真的隱藏按鈕（例如非 Mini500
+   機型時「回溫點／乾燥終點／第一聲」仍會顯示），這裡加大特異度把 [hidden] 的隱藏效果搶回來 */
+.crack-btn[hidden]{ display:none; }
 
 .capture-panel{ background:var(--parchment); border:1px dashed var(--copper); border-radius:var(--radius); padding:16px; box-shadow:0 18px 40px rgba(0,0,0,.35); }
 .capture-panel--active{ animation:pulse 1.4s ease-in-out infinite; }

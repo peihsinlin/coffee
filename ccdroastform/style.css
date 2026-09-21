@@ -161,12 +161,16 @@ label > *:not(:first-child){ margin-top:6px; }
 .list-col-title{ font-size:12px; font-weight:700; color:var(--ink-soft); margin:0 0 6px; }
 
 /* Mini500 專用：風門提醒的時間文字比 SR540/800 長（帶了「乾燥終點後」等事件錨點文字），
-   固定平分兩欄會讓風門欄太窄，數值被迫斷行；改成風門欄分配較寬的比例，
-   並讓時間／數值文字都不換行，寬度真的不夠時改成整行換到下一行，不會再逐字斷行 */
-.plan-custom-lists--mini{ grid-template-columns:2fr 3fr; gap:0 8px; }
-.plan-custom-lists--mini .event-list li{ flex-wrap:wrap; row-gap:4px; }
-.plan-custom-lists--mini .event-list__time{ font-size:11.5px; white-space:nowrap; }
-.plan-custom-lists--mini .event-list__label{ white-space:nowrap; flex:1 1 auto; }
+   先前改成「火力2欄、風門3欄」平分寬度，在較窄或中文字型渲染較寬的機型（如部分 Android 手機）
+   上仍然不夠、還是會斷行；改成火力／風門提醒上下各佔一整列，讓風門提醒欄位能用到完整寬度，
+   並把整列改成不換行（flex-wrap:nowrap），寬度不足時交由字級微調而不是靠斷行或換欄硬擠 */
+.plan-custom-lists--mini{ display:block; }
+.plan-custom-lists--mini > div{ margin-top:14px; }
+.plan-custom-lists--mini > div:first-child{ margin-top:0; }
+.plan-custom-lists--mini .event-list li{ flex-wrap:nowrap; }
+.plan-custom-lists--mini .event-list__time{ font-size:12px; white-space:nowrap; flex:0 0 auto; }
+.plan-custom-lists--mini .event-list__label{ font-size:13px; white-space:nowrap; flex:0 0 auto; }
+.plan-custom-lists--mini .event-list__del{ flex:0 0 auto; margin-left:auto; }
 
 .setup-footer, .roast-footer, .result-footer{ position:sticky; bottom:0; z-index:5; padding-top:12px; display:flex; flex-direction:column; gap:10px; background:var(--espresso); }
 

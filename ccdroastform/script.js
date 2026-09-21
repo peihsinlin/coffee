@@ -415,6 +415,10 @@ document.addEventListener('visibilitychange', function(){
     requestWakeLock();
     resumeAudioCtx();
     keepAlivePlaying();
+    // 畫面從背景／螢幕關閉切回前景時，也順便把可能卡住的語音佇列恢復一次
+    try {
+      if ('speechSynthesis' in window && window.speechSynthesis.paused) window.speechSynthesis.resume();
+    } catch (e){}
   }
 });
 
@@ -1372,6 +1376,19 @@ function tick(){
   resumeAudioCtx(); // 每秒檢查一次，iPhone 背景／閒置後 AudioContext 被 suspend 時可以盡快恢復
   var elapsed = roast.pausedElapsed + Math.floor((Date.now() - roast.startAt) / 1000);
   roast.elapsed = elapsed;
+  // 部分 Android 瀏覽器的語音（speechSynthesis）有已知 bug：佇列裡的語音有時會卡在
+  // 「準備要唸」卻實際上不出聲，一直悶著直到畫面狀態改變（例如螢幕關掉）才會突然補講，
+  // 這正是「烘豆很久都沒有聲音、螢幕關掉才發出聲音」的成因。跟嗶聲一樣，被暫停就先恢復；
+  // 每 3 秒（不用每秒，太頻繁可能打斷正在講的短句）額外做一次 pause／resume 的「踢一下」，
+  // 把卡住的佇列踢醒，這是這類 bug 常見的因應方式
+  if ('speechSynthesis' in window){
+    var ss = window.speechSynthesis;
+    if (ss.paused) ss.resume();
+    else if ((ss.speaking || ss.pending) && elapsed % 3 === 0){
+      ss.pause();
+      ss.resume();
+    }
+  }
   // 畫面上顯示的計時器：Mini500 按下「回溫點」後會歸零重新計算（見 timeOffset），
   // 溫度紀錄／事件時間軸內部仍用未歸零的絕對累計秒數（elapsed）當作時間座標，兩者不會互相影響
   var dispElapsed = elapsed - (roast.timeOffset || 0);
@@ -1566,6 +1583,14 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!machineName || !document.getElementById('roasterName').value.trim() || !document.getElementById('beanOrigin').value.trim() || !(parseFloat(document.getElementById('weightBefore').value) > 0) || !document.getElementById('sessionTemp').value.trim()) return;
     // 解鎖音效／語音失敗也不該卡住「開始烘豆」，某些 Android 瀏覽器在這一步丟例外時
     // 若沒接住，會讓整個點擊處理中斷，畫面看起來像按了完全沒反應
+    // 上一次烘豆（或上一次「開始新的烘豆」後停留在設定頁）殘留的語音佇列／暫停狀態，
+    // 有些手機瀏覽器會一直卡著不清除，導致這次烘豆很久都沒有語音提示，直到螢幕關掉、
+    // 系統把分頁狀態重置後才突然補講；每次真正開始烘豆時先清空佇列、把解鎖狀態重設，
+    // 強制重新解鎖一次，避免延續到上一輪的壞狀態
+    try {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    } catch (e){}
+    speechPrimed = false;
     try { primeAudio(); } catch (e){}
     try { primeSpeech(); } catch (e){}
 

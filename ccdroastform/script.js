@@ -272,12 +272,25 @@ function resumeAudioCtx(){
   if (audioCtx && audioCtx.state === 'suspended'){
     audioCtx.resume().catch(function(){});
   }
+  keepAlivePlaying();
+}
+// iPhone 近期會在「靜音鍵切到靜音」或畫面閒置一段時間後，把 AudioContext 播出的嗶聲當成
+// 一般背景音效而整個消音（即使 resume() 顯示已成功），這是「嘟嘟嘟嗶提醒聲不見了」的主因。
+// 讓一段極短、幾乎無聲的 <audio> 維持在播放狀態，可以讓系統把這個分頁判定成「正在播放音訊」，
+// 使後續 Web Audio 的嗶聲即使在靜音鍵開啟時也能正常播出；沒有播放中就嘗試重新播放一次即可。
+function keepAlivePlaying(){
+  var el = document.getElementById('silentKeepAlive');
+  if (!el) return;
+  if (el.paused){
+    el.play().catch(function(){});
+  }
 }
 // Android Chrome 的自動播放限制比較嚴格：AudioContext 必須在使用者手勢（點擊）當下就實際呼叫
 // resume() 並播放過一次聲音才算「解鎖」，之後計時器（非使用者操作）裡才能正常播放嗶聲，
 // 只呼叫 ensureAudioCtx() 建立 context、卻沒在手勢當下 resume＋播放，就是「Android沒有嗶聲」的主因。
 var audioPrimed = false;
 function primeAudio(){
+  keepAlivePlaying(); // 在使用者手勢當下啟動，之後才有機會在背景／靜音鍵狀態下持續播放
   if (audioPrimed) return;
   var ctx = ensureAudioCtx();
   if (!ctx) return;
@@ -401,6 +414,7 @@ document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible' && roast && roast.running){
     requestWakeLock();
     resumeAudioCtx();
+    keepAlivePlaying();
   }
 });
 
@@ -822,11 +836,17 @@ function showTempPrompt(auto, crackLabel){
   // 記錄「彈出當下」的累計秒數，送出時一律用這個時間點，不用送出當下的時間，
   // 避免打字／猶豫太久導致實際記錄的時間點被延後
   if (roast) roast.pendingPromptElapsed = roast.elapsed;
-  // 用 requestAnimationFrame 等面板真的顯示、版面更新完再 focus，
-  // 避免剛切換 hidden 的當下某些手機瀏覽器 focus 不會生效，游標沒有真的跳進輸入欄位
+  // 面板在畫面上的位置可能離目前捲動位置很遠（例如按下畫面最下方的「結束烘豆，查看結果」按鈕時，
+  // 面板其實在畫面中段、當下不在可視範圍內），iPhone 在輸入框還沒捲進畫面內時 focus 常常悄悄失敗，
+  // 游標不會真的跳進欄位、鍵盤也不會跳出來，使用者完全看不出來要輸入溫度，因此先捲動讓面板進入畫面
+  if (typeof panel.scrollIntoView === 'function') panel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // 用兩層 requestAnimationFrame 等捲動與版面都穩定後再 focus，
+  // 避免剛切換 hidden／捲動的當下某些手機瀏覽器 focus 不會生效，游標沒有真的跳進輸入欄位
   requestAnimationFrame(function(){
-    input.focus();
-    if (typeof input.select === 'function') input.select();
+    requestAnimationFrame(function(){
+      input.focus();
+      if (typeof input.select === 'function') input.select();
+    });
   });
 }
 function hideTempPrompt(){
@@ -1019,7 +1039,7 @@ function computeThermalEnergy(tempLog, crackEvents, machineName){
 }
 
 function computeSummary(){
-  var summary = { dtrText: '—', devTimeText: '—', devPercentText: '—', riseText: '—', lossText: '—', energyText: '—' };
+  var summary = { dtrText: '—', devTimeText: '—', devPercentText: '—', devRiseText: '—', riseText: '—', lossText: '—', energyText: '—' };
   if (!roast) return summary;
 
   // 發展時間比 DTR = (結束時間 - 一爆開始時間) / 結束時間，拆成「發展時間」「發展百分比」兩個獨立數值顯示
@@ -1041,6 +1061,12 @@ function computeSummary(){
   if (startTemp != null && endTemp != null){
     var rise = endTemp - startTemp;
     summary.riseText = (rise >= 0 ? '+' : '') + rise.toFixed(0) + '°C';
+  }
+
+  // 發展期升溫 = 下豆溫度（或最後一筆溫度）－ 一爆起溫度
+  if (firstCrack && firstCrack.temp != null && endTemp != null){
+    var devRise = endTemp - firstCrack.temp;
+    summary.devRiseText = (devRise >= 0 ? '+' : '') + devRise.toFixed(0) + '°C';
   }
 
   // 失重 = (烘前重量 － 烘後重量) / 烘前重量
@@ -1324,6 +1350,7 @@ function renderSummary(){
   var s = computeSummary();
   document.getElementById('summaryDevTime').textContent = s.devTimeText;
   document.getElementById('summaryDevPercent').textContent = s.devPercentText;
+  document.getElementById('summaryDevRise').textContent = s.devRiseText;
   document.getElementById('summaryRise').textContent = s.riseText;
   document.getElementById('summaryLoss').textContent = s.lossText;
   document.getElementById('summaryEnergy').textContent = s.energyText;
@@ -2166,7 +2193,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var beanParts = [gb.origin, gb.farm, gb.variety, gb.process].filter(function(v){ return v; });
     var line1Text = (beanParts.length ? beanParts.join(' · ') + ' ' : '') + '烘焙紀錄';
     var line2Text = '烘豆機：' + roast.machineName + '　烘豆師：' + ((roast.session && roast.session.roasterName) || '—') + '　烘豆時間：' + roast.dateStr;
-    var line3Text = '總時間 ' + formatTime(roast.elapsed) + '　DTR ' + summary.dtrText + '　總升溫 ' + summary.riseText + '　總熱能 ' + summary.energyText + '　失重 ' + summary.lossText;
+    var line3Text = '烘豆時間 ' + formatTime(roast.elapsed) + '　總升溫 ' + summary.riseText + '　總熱能 ' + summary.energyText + '　發展時間 ' + summary.devTimeText + '　發展百分比 ' + summary.devPercentText + '　發展期升溫 ' + summary.devRiseText;
     var weightAfterVal = document.getElementById('weightAfter').value;
     var levelBean = document.getElementById('roastLevelBean').value;
     var levelCoarse = document.getElementById('roastLevelCoarse').value;

@@ -11,6 +11,11 @@
 </head>
 <body>
 
+<!-- iPhone 提醒音效用：背景播放一段幾乎無聲的音檔，讓瀏覽器維持「有音訊在播放」的狀態，
+     避免 iOS 在響鈴／靜音切換到靜音、或畫面待機一段時間後，把嗶聲判定為背景音效而消音。
+     為避免依賴外部檔案，直接內嵌極短的靜音 WAV（data URI），設 loop 讓它持續播放。 -->
+<audio id="silentKeepAlive" loop playsinline style="display:none" src="data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUAGAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA"></audio>
+
 <!-- 提示：在 LINE／IG／FB 等 App 內建瀏覽器開啟時，列印與另存圖片功能會受限，提示改用手機瀏覽器開啟。
      顯示／隱藏一律由 JS 直接設定 inline style（見 script.js 的 isInAppBrowser／dismiss 邏輯），
      不依賴 hidden 屬性或 CSS 選擇器優先權，避免又被其他樣式蓋掉而卡住無法關閉 -->
@@ -328,7 +333,9 @@
       <div class="crack-btn-row">
         <button type="button" class="btn btn--sm crack-btn crack-btn--mini" data-label="回溫點" hidden>回溫點</button>
         <button type="button" class="btn btn--sm crack-btn crack-btn--mini" data-label="乾燥終點" hidden>乾燥終點</button>
-        <button type="button" class="btn btn--sm crack-btn crack-btn--mini" data-label="第一聲" hidden>第一聲</button>
+        <button type="button" class="btn btn--sm crack-btn" data-label="第一聲">第一聲</button>
+      </div>
+      <div class="crack-btn-row">
         <button type="button" class="btn btn--sm crack-btn" data-label="一爆起">一爆起</button>
         <button type="button" class="btn btn--sm crack-btn" data-label="一爆止">一爆止</button>
         <button type="button" class="btn btn--sm crack-btn" data-label="二爆起">二爆起</button>
@@ -408,11 +415,12 @@
           <div><dt>發展百分比</dt><dd id="summaryDevPercent">—</dd></div>
         </dl>
         <dl class="summary-grid">
+          <div><dt>發展期升溫</dt><dd id="summaryDevRise">—</dd></div>
           <div><dt>總升溫</dt><dd id="summaryRise">—</dd></div>
-          <div><dt>失重</dt><dd id="summaryLoss">—</dd></div>
         </dl>
         <dl class="summary-grid">
           <div><dt>總熱能</dt><dd id="summaryEnergy">—</dd></div>
+          <div><dt>失重</dt><dd id="summaryLoss">—</dd></div>
         </dl>
         <div class="field-grid">
           <label>烘後重量（g）
@@ -477,6 +485,6 @@
   </main>
 </div>
 
-<script src="script.js?v=20260934"></script>
+<script src="script.js?v=20260936"></script>
 </body>
 </html>

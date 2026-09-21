@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260922">
+<link rel="stylesheet" href="style.css?v=20260927">
 </head>
 <body>
 
@@ -125,25 +125,117 @@
 
         <div id="planFixedFields">
         <p class="panel__hint">輸入烘前重量後會自動帶入建議數值，也可以手動調整</p>
-        <div class="field-grid field-grid--3">
+        <div class="field-grid">
           <label>入豆溫度（°C）
             <input type="number" id="planChargeTemp" placeholder="—">
           </label>
           <label>轉速（rpm）
             <input type="number" id="sessionRpm" placeholder="—">
           </label>
+        </div>
+        <div class="field-grid field-grid--gap-top">
+          <label>初始火力
+            <input type="number" id="planPowerInit" placeholder="—" step="0.1" min="0.1" max="3.0" value="0.1">
+          </label>
           <label>初始風門
-            <input type="text" id="planDamper000" placeholder="—">
+            <select id="planDamperInit" class="field-select">
+              <option value="全開">全開</option>
+              <option value="左5">左5</option>
+              <option value="左4">左4</option>
+              <option value="左3">左3</option>
+              <option value="左2">左2</option>
+              <option value="左1">左1</option>
+              <option value="中間">中間</option>
+              <option value="右1">右1</option>
+              <option value="右2">右2</option>
+              <option value="右3">右3</option>
+              <option value="右4">右4</option>
+              <option value="右5">右5</option>
+              <option value="全關">全關</option>
+            </select>
           </label>
-          <label>回溫點火力
-            <input type="number" id="planPower000" placeholder="—">
-          </label>
-          <label>2:00 火力
-            <input type="number" id="planPower200" placeholder="—">
-          </label>
-          <label>8:00 火力
-            <input type="number" id="planPower800" placeholder="—">
-          </label>
+        </div>
+        </div>
+
+        <div id="planMiniCustomSection" hidden>
+        <h3 class="panel__subtitle">自訂操作提醒</h3>
+        <p class="panel__hint">輸入烘前重量後會自動帶入建議的回溫點火力、2:00 火力、8:00 火力，也可以自行新增／刪除；開始烘豆並按下「回溫點」後，這些提醒才會依重新歸零的時間開始生效，屆時會用嗶聲與語音提醒，並跳出確認視窗才會真正寫入紀錄</p>
+
+        <div class="mini-add-box">
+          <h4 class="mini-add-box__title">新增火力提醒</h4>
+          <div class="field-grid">
+            <label>時間（分:秒）
+              <div class="time-input">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newMiniFireMin" placeholder="分">
+                <span>:</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newMiniFireSec" placeholder="秒">
+              </div>
+            </label>
+            <label>數值（0.1-3.0）
+              <input type="number" step="0.1" min="0.1" max="3.0" id="newMiniFireValue" placeholder="例如：0.8">
+            </label>
+          </div>
+          <div class="form-error" id="miniFireFormError"></div>
+          <button type="button" id="btnAddMiniFireEvent" class="btn btn--outline btn--sm">新增火力提醒</button>
+        </div>
+
+        <div class="mini-add-box">
+          <h4 class="mini-add-box__title">新增風門提醒</h4>
+          <div class="field-grid field-grid--3">
+            <label>事件
+              <select id="newMiniDamperAnchor" class="field-select">
+                <option value="">無</option>
+                <option value="回溫點">回溫點</option>
+                <option value="乾燥終點">乾燥終點</option>
+                <option value="第一聲">第一聲</option>
+                <option value="一爆起">一爆起</option>
+                <option value="一爆止">一爆止</option>
+                <option value="二爆起">二爆起</option>
+                <option value="二爆止">二爆止</option>
+              </select>
+            </label>
+            <label>時間（分:秒）
+              <div class="time-input">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newMiniDamperMin" placeholder="分">
+                <span>:</span>
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="newMiniDamperSec" placeholder="秒">
+              </div>
+            </label>
+            <label>風門
+              <select id="newMiniDamperValue" class="field-select">
+                <option value="全開">全開</option>
+                <option value="左5">左5</option>
+                <option value="左4">左4</option>
+                <option value="左3">左3</option>
+                <option value="左2">左2</option>
+                <option value="左1">左1</option>
+                <option value="中間">中間</option>
+                <option value="右1">右1</option>
+                <option value="右2">右2</option>
+                <option value="右3">右3</option>
+                <option value="右4">右4</option>
+                <option value="右5">右5</option>
+                <option value="全關">全關</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-error" id="miniDamperFormError"></div>
+          <button type="button" id="btnAddMiniDamperEvent" class="btn btn--outline btn--sm">新增風門提醒</button>
+        </div>
+
+        <div class="plan-custom-lists plan-custom-lists--mini">
+          <div>
+            <h4 class="list-col-title">火力提醒</h4>
+            <ul id="planMiniFireList" class="event-list">
+              <li class="event-list__empty">尚未加入</li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="list-col-title">風門提醒</h4>
+            <ul id="planMiniDamperList" class="event-list">
+              <li class="event-list__empty">尚未加入</li>
+            </ul>
+          </div>
         </div>
         </div>
 
@@ -234,6 +326,9 @@
       </div>
 
       <div class="crack-btn-row">
+        <button type="button" class="btn btn--sm crack-btn crack-btn--mini" data-label="回溫點" hidden>回溫點</button>
+        <button type="button" class="btn btn--sm crack-btn crack-btn--mini" data-label="乾燥終點" hidden>乾燥終點</button>
+        <button type="button" class="btn btn--sm crack-btn crack-btn--mini" data-label="第一聲" hidden>第一聲</button>
         <button type="button" class="btn btn--sm crack-btn" data-label="一爆起">一爆起</button>
         <button type="button" class="btn btn--sm crack-btn" data-label="一爆止">一爆止</button>
         <button type="button" class="btn btn--sm crack-btn" data-label="二爆起">二爆起</button>
@@ -381,6 +476,6 @@
   </main>
 </div>
 
-<script src="script.js?v=20260927"></script>
+<script src="script.js?v=20260933"></script>
 </body>
 </html>

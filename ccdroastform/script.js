@@ -1,6 +1,8 @@
 'use strict';
 
-var state = { planEvents: [] };  // {id, seconds, type, value}
+var state = { planEvents: [], miniFireEvents: [], miniDamperEvents: [] };  // planEvents: {id, seconds, type, value}（SR540/SR800 專用）
+// miniFireEvents: {id, seconds, value, auto?}（Mini500 火力提醒，value 為 0.1-3.0 的字串）
+// miniDamperEvents: {id, anchor, seconds, value, auto?}（Mini500 風門提醒，anchor 為空字串代表「無」，否則為錨定的爆點事件名稱）
 
 var roast = null;         // active/finished roast data
 var timerInterval = null;
@@ -89,6 +91,36 @@ function renderPlanEventList(){
   renderList('planEventListFire', fire);
 }
 
+// ---------- 自訂操作提醒（Mini500 專用：火力／風門分開自訂） ----------
+function renderMiniPlanEventList(){
+  var fire = state.miniFireEvents.slice().sort(function(a, b){ return a.seconds - b.seconds; });
+  var damper = state.miniDamperEvents.slice().sort(function(a, b){
+    var aa = a.anchor || '', bb = b.anchor || '';
+    if (aa !== bb) return aa === '' ? -1 : (bb === '' ? 1 : aa.localeCompare(bb));
+    return a.seconds - b.seconds;
+  });
+
+  function renderList(elId, items, isDamper){
+    var list = document.getElementById(elId);
+    if (!list) return;
+    if (items.length === 0){
+      list.innerHTML = '<li class="event-list__empty">尚未加入</li>';
+      return;
+    }
+    list.innerHTML = items.map(function(ev){
+      var timeLabel = (isDamper && ev.anchor) ? (ev.anchor + '後 ' + formatTime(ev.seconds)) : formatTime(ev.seconds);
+      return '<li>' +
+        '<span class="event-list__time">' + escapeHtml(timeLabel) + '</span>' +
+        '<span class="event-list__label">' + escapeHtml(ev.value) + '</span>' +
+        '<button type="button" class="event-list__del" data-id="' + ev.id + '" aria-label="刪除">✕</button>' +
+        '</li>';
+    }).join('');
+  }
+
+  renderList('planMiniFireList', fire, false);
+  renderList('planMiniDamperList', damper, true);
+}
+
 // ---------- 烘焙計劃預設曲線（Fresh Roast SR540／SR800）----------
 // 每筆用 [秒數, 數值] 表示，匯入時會轉成跟手動新增一樣的 state.planEvents 項目
 var ROAST_PLAN_PRESETS = {
@@ -158,7 +190,12 @@ function importPlanPreset(presetId){
   renderPlanEventList();
 }
 
+// ---------- Mini500 專用：風門選項（順序固定，調整面板的 +/- 也依這個順序切換） ----------
+var DAMPER_OPTIONS = ['全開','左5','左4','左3','左2','左1','中間','右1','右2','右3','右4','右5','全關'];
+
 // ---------- 烘焙計劃：目前僅 Mini500 有對照表，依烘前重量自動帶入建議值 ----------
+// 對照表裡的 power000/power200/power800 是「火力 x10」的整數（例如 4 代表 0.4），
+// 實際帶入欄位時要除以10，欄位輸入範圍限制在 0.1-3.0
 function getRoastPlan(weight){
   if (weight <= 225)  return { chargeTemp:130, damper000:'右2', power000:4, power200:6, power800:4, rpm:55 };
   if (weight <= 275)  return { chargeTemp:135, damper000:'右2', power000:5, power200:7, power800:5, rpm:56 };
@@ -168,10 +205,19 @@ function getRoastPlan(weight){
   return { chargeTemp:160, damper000:'右1', power000:9, power200:11, power800:9, rpm:60 };
 }
 function clearRoastPlan(){
-  ['planChargeTemp','planDamper000','planPower000','planPower200','planPower800','sessionRpm'].forEach(function(id){
-    document.getElementById(id).value = '';
+  ['planChargeTemp','sessionRpm'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
   });
+  state.miniFireEvents = [];
+  state.miniDamperEvents = [];
+  renderMiniPlanEventList();
 }
+// 依烘前重量帶入建議值：入豆溫度／轉速／初始風門直接填入欄位，回溫點火力、2:00 火力、8:00 火力
+// 則以「自動帶入」的提醒項目加進火力清單（會先移除先前自動帶入的項目再重新加入，
+// 使用者自己手動新增的提醒不受影響）；初始火力欄位維持使用者自行輸入的值（預設 0.1），不會被覆蓋。
+// 風門提醒固定自動帶入「乾燥終點後 00:00 全開」「乾燥終點後 00:50 左2」「乾燥終點後 01:00 右2」
+// 「一爆起後 00:50 全開」這四筆預設值，不論烘前重量多少都一樣（沒有對照表可查，是固定的操作建議）
 function applyRoastPlan(){
   var machine = document.getElementById('machineSelect').value;
   if (machine !== 'Mini500'){
@@ -182,11 +228,21 @@ function applyRoastPlan(){
   if (!weight || weight <= 0) return;
   var plan = getRoastPlan(weight);
   document.getElementById('planChargeTemp').value = plan.chargeTemp;
-  document.getElementById('planDamper000').value = plan.damper000;
-  document.getElementById('planPower000').value = plan.power000;
-  document.getElementById('planPower200').value = plan.power200;
-  document.getElementById('planPower800').value = plan.power800;
   document.getElementById('sessionRpm').value = plan.rpm;
+  document.getElementById('planDamperInit').value = plan.damper000;
+
+  state.miniFireEvents = state.miniFireEvents.filter(function(ev){ return !ev.auto; });
+  state.miniFireEvents.push({ id: uid(), seconds: 0, value: (plan.power000 / 10).toFixed(1), auto: true });
+  state.miniFireEvents.push({ id: uid(), seconds: 120, value: (plan.power200 / 10).toFixed(1), auto: true });
+  state.miniFireEvents.push({ id: uid(), seconds: 480, value: (plan.power800 / 10).toFixed(1), auto: true });
+
+  state.miniDamperEvents = state.miniDamperEvents.filter(function(ev){ return !ev.auto; });
+  state.miniDamperEvents.push({ id: uid(), anchor: '乾燥終點', seconds: 0, value: '全開', auto: true });
+  state.miniDamperEvents.push({ id: uid(), anchor: '乾燥終點', seconds: 50, value: '左2', auto: true });
+  state.miniDamperEvents.push({ id: uid(), anchor: '乾燥終點', seconds: 60, value: '右2', auto: true });
+  state.miniDamperEvents.push({ id: uid(), anchor: '一爆起', seconds: 50, value: '全開', auto: true });
+
+  renderMiniPlanEventList();
 }
 
 // ---------- 音效與語音 ----------
@@ -494,8 +550,9 @@ var CHART_THEMES = {
   }
 };
 
-function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackEvents, theme){
+function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackEvents, theme, machine){
   var th = CHART_THEMES[theme] || CHART_THEMES.dark;
+  var isMini = machine === 'Mini500';
   stepBandH = stepBandH || 0;
   var stepGap = stepBandH > 0 ? 22 : 0;
 
@@ -527,11 +584,18 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   function xScale(t){ return x0 + padL + (t / maxT) * plotW; }
   function yScale(temp){ return y0 + padT + (1 - (temp - minTemp) / (maxTemp - minTemp)) * plotH; }
 
-  // 烘焙階段背景色：155°C以下為「乾燥期」淡綠、155°C至一爆起為「梅納期」淺黃、一爆起以上為「發展期」淺紅
-  // 尚未記錄一爆起時，梅納期的淺黃背景先延伸到圖表頂端（還不知道發展期從哪裡開始）
-  var dryEnd = 155;
+  // 烘焙階段背景色：SR540／SR800 維持原本固定 155°C 分期；Mini500 改用「乾燥終點」事件的實際溫度來分期
+  // （乾燥終點以下為脫水期淡綠、乾燥終點至一爆起為梅納期淺黃、一爆起以上為發展期淺紅）
+  // 尚未記錄對應事件時，後面的分期先不畫，整段當作前一期
   var firstCrack = findEventByKeyword(crackEvents || [], '一爆');
   var developmentStart = firstCrack ? firstCrack.temp : null;
+  var dryEnd;
+  if (isMini){
+    var dryEndEvent = findEventByKeyword(crackEvents || [], '乾燥終點');
+    dryEnd = dryEndEvent ? dryEndEvent.temp : null;
+  } else {
+    dryEnd = 155;
+  }
   function fillTempBand(tLo, tHi, color){
     var lo = Math.max(minTemp, tLo);
     var hi = Math.min(maxTemp, tHi);
@@ -545,12 +609,16 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   ctx.beginPath();
   ctx.rect(x0 + padL, y0 + padT, plotW, plotH);
   ctx.clip();
-  fillTempBand(-Infinity, dryEnd, th.bandDry);
-  if (developmentStart != null){
-    fillTempBand(dryEnd, developmentStart, th.bandMaillard);
-    fillTempBand(developmentStart, Infinity, th.bandDevelopment);
+  if (dryEnd == null){
+    fillTempBand(-Infinity, Infinity, th.bandDry);
   } else {
-    fillTempBand(dryEnd, Infinity, th.bandMaillard);
+    fillTempBand(-Infinity, dryEnd, th.bandDry);
+    if (developmentStart != null){
+      fillTempBand(dryEnd, developmentStart, th.bandMaillard);
+      fillTempBand(developmentStart, Infinity, th.bandDevelopment);
+    } else {
+      fillTempBand(dryEnd, Infinity, th.bandMaillard);
+    }
   }
   ctx.restore();
 
@@ -566,12 +634,19 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
     ctx.fillText(String(t), x0 + padL - 6, y + 3);
   }
 
-  // RoR 副軸（右側刻度）
+  // RoR 副軸（右側刻度）：SR540／SR800 維持原本依數值動態縮放（最小60）；
+  // Mini500 改成固定上限20，且負值（升溫速率為負）直接不畫進線裡，只保留 0 與正值
   var rorSeries = computeRorSeries(tempLog);
-  var rorMax = 60;
-  if (rorSeries.length){
-    var maxAbs = Math.max.apply(null, rorSeries.map(function(r){ return Math.abs(r.ror); }).concat([10]));
-    rorMax = Math.max(60, Math.ceil(maxAbs / 10) * 10);
+  var rorMax;
+  if (isMini){
+    rorSeries = rorSeries.filter(function(r){ return r.ror >= 0; });
+    rorMax = 20;
+  } else {
+    rorMax = 60;
+    if (rorSeries.length){
+      var maxAbs = Math.max.apply(null, rorSeries.map(function(r){ return Math.abs(r.ror); }).concat([10]));
+      rorMax = Math.max(60, Math.ceil(maxAbs / 10) * 10);
+    }
   }
   function yScaleRor(v){
     var clamped = Math.max(0, Math.min(rorMax, v));
@@ -677,12 +752,28 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   ctx.fillStyle = th.legendText; ctx.fillText('RoR', x0 + padL + 22, y0 + 31);
 
   // 時間刻度
+  // Mini500 按下「回溫點」後，回溫點那一刻要接著標記「00:00」，之後的刻度都依回溫點重新歸零計算
+  // （只改標籤文字與刻度落點，曲線本身仍照實際累計時間畫，不會因此變形）
   ctx.fillStyle = th.axisText;
   ctx.font = '10px monospace';
   ctx.textAlign = 'center';
   var xStep = maxT > 600 ? 120 : 60;
-  for (var tt = 0; tt <= maxT; tt += xStep){
-    ctx.fillText(formatTime(tt), xScale(tt), y0 + mainH - 8);
+  var chartResetAt = null;
+  if (isMini){
+    var chartTpEvent = findEventByKeyword(crackEvents || [], '回溫點');
+    chartResetAt = chartTpEvent ? chartTpEvent.t : null;
+  }
+  if (chartResetAt != null){
+    for (var tt1 = 0; tt1 < chartResetAt; tt1 += xStep){
+      ctx.fillText(formatTime(tt1), xScale(tt1), y0 + mainH - 8);
+    }
+    for (var tt2 = chartResetAt; tt2 <= maxT; tt2 += xStep){
+      ctx.fillText(formatTime(tt2 - chartResetAt), xScale(tt2), y0 + mainH - 8);
+    }
+  } else {
+    for (var tt = 0; tt <= maxT; tt += xStep){
+      ctx.fillText(formatTime(tt), xScale(tt), y0 + mainH - 8);
+    }
   }
 
   // 風速／火力階梯圖（僅在有這類事件時顯示），跟上方圖表隔開一段距離
@@ -698,23 +789,25 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   }
 }
 
+// 風速／火力階梯圖是依 1-9 數值設計的，Mini500 的「風門」不是數值、「火力」又改成 0.1-3.0，
+// 跟這個階梯圖的畫法不相容，所以 Mini500 一律不顯示階梯圖，風門／火力只顯示在下方的事件時間軸表格
 function drawLiveCurve(){
   var canvas = document.getElementById('liveCurve');
-  var hasFP = hasFanPowerEvents(roast.triggeredLog);
+  var hasFP = roast.machineName !== 'Mini500' && hasFanPowerEvents(roast.triggeredLog);
   var stepBandH = hasFP ? 90 : 0;
   canvas.style.height = (180 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light');
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light', roast.machineName);
   renderBeanInfoTable('liveBeanInfoBody');
   renderLogTable('liveLogTableBody');
 }
 function drawResultCurve(){
   var canvas = document.getElementById('resultCurve');
-  var hasFP = hasFanPowerEvents(roast.triggeredLog);
+  var hasFP = roast.machineName !== 'Mini500' && hasFanPowerEvents(roast.triggeredLog);
   var stepBandH = hasFP ? 100 : 0;
   canvas.style.height = (260 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light');
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light', roast.machineName);
 }
 
 // ---------- 溫度輸入面板 ----------
@@ -774,6 +867,19 @@ function resolvePendingConfirm(idx, write){
   }
   renderConfirmPanel();
 }
+// ---------- Mini500 專用：風門提醒的「事件錨點」排程 ----------
+// 風門自訂提醒若選了事件（回溫點／乾燥終點／第一聲／一爆起／一爆止／二爆起／二爆止），
+// 不會有固定的絕對觸發時間，要等該事件真的被記錄下來時，才依「事件發生時間＋設定的分:秒」動態排入 roast.events，
+// 用跟固定時間提醒完全相同的「嗶聲＋語音＋確認寫入」流程處理
+function scheduleAnchoredDamperEvents(anchorLabel, anchorT){
+  if (!roast || !roast.pendingAnchorEvents) return;
+  roast.pendingAnchorEvents.forEach(function(item){
+    if (item.scheduled || item.anchor !== anchorLabel) return;
+    item.scheduled = true;
+    roast.events.push({ label: '風門 ' + item.value, seconds: anchorT + item.offsetSeconds, triggered: false });
+  });
+}
+
 function hideEventConfirm(){
   if (roast && roast.pendingConfirms){
     roast.pendingConfirms.forEach(function(item){ clearTimeout(item.timer); });
@@ -803,6 +909,43 @@ function getCurrentAdjustValue(type){
   if (matches.length === 0) return 5;
   var latest = matches.reduce(function(a, b){ return a.t > b.t ? a : b; });
   return clampAdjustValue(latest.label.slice(type.length + 1));
+}
+
+// ---------- Mini500 專用：風門（1-9 以外，改成從固定選項清單裡選）／火力（0.1-3.0 小數）的調整邏輯 ----------
+function clampPowerDecimal(v){
+  v = parseFloat(v);
+  if (isNaN(v)) v = 1;
+  v = Math.max(0.1, Math.min(3.0, v));
+  return Math.round(v * 10) / 10;
+}
+// 依 DAMPER_OPTIONS 清單的順序，往前／往後切換一格（超出範圍就停在頭尾，不循環）
+function stepDamperValue(current, delta){
+  var idx = DAMPER_OPTIONS.indexOf(current);
+  if (idx === -1) idx = 6; // 找不到目前值時，預設從「中間」開始
+  idx = Math.max(0, Math.min(DAMPER_OPTIONS.length - 1, idx + delta));
+  return DAMPER_OPTIONS[idx];
+}
+// 找出目前的風門數值（紀錄中最新一筆風門），沒有紀錄時預設用設定頁帶入的初始風門
+function getCurrentDamperValue(){
+  if (!roast) return DAMPER_OPTIONS[6];
+  var matches = roast.triggeredLog.filter(function(ev){ return ev.label.indexOf('風門 ') === 0; });
+  if (matches.length === 0){
+    var initial = roast.plan && roast.plan.damperInit;
+    return (initial && DAMPER_OPTIONS.indexOf(initial) !== -1) ? initial : DAMPER_OPTIONS[6];
+  }
+  var latest = matches.reduce(function(a, b){ return a.t > b.t ? a : b; });
+  return latest.label.slice(3);
+}
+// 找出目前的火力數值（Mini500 的小數版本，紀錄中最新一筆火力），沒有紀錄時預設用設定頁帶入的初始火力
+function getCurrentPowerDecimal(){
+  if (!roast) return '1.0';
+  var matches = roast.triggeredLog.filter(function(ev){ return ev.label.indexOf('火力 ') === 0; });
+  if (matches.length === 0){
+    var initial = roast.plan && parseFloat(roast.plan.powerInit);
+    return clampPowerDecimal(initial || 1).toFixed(1);
+  }
+  var latest = matches.reduce(function(a, b){ return a.t > b.t ? a : b; });
+  return clampPowerDecimal(latest.label.slice(3)).toFixed(1);
 }
 
 function findNearestTemp(tempLog, t){
@@ -848,15 +991,23 @@ function findEventByKeyword(triggeredLog, keyword){
 // 曲線下面積（梯形法積分溫度對時間），當作「總熱能」的相對比較指標：
 // 面積越大代表整段烘焙過程中溫度（豆溫）累積得越高／越久，可以用來比較不同烘焙之間的熱量差異，
 // 單位是 °C·分（溫度乘以時間），不是實際物理熱力學上的焦耳，只是一個方便比較的相對數值
-function computeThermalEnergy(tempLog){
+function computeThermalEnergy(tempLog, crackEvents, machineName){
   var pts = (tempLog || []).slice().sort(function(a, b){ return a.t - b.t; });
+  // Mini500：總熱能只算「回溫點之後」的曲線下面積（回溫點溫度不清空紀錄，但積分只取回溫點（含）以後的點）
+  if (machineName === 'Mini500'){
+    var tpMatches = (crackEvents || []).filter(function(e){ return e.label === '回溫點'; });
+    if (tpMatches.length){
+      var tp = tpMatches.reduce(function(a, b){ return a.t < b.t ? a : b; });
+      pts = pts.filter(function(p){ return p.t >= tp.t; });
+    }
+  }
   if (pts.length < 2) return null;
   var area = 0;
   for (var i = 1; i < pts.length; i++){
     var dt = pts[i].t - pts[i - 1].t;
     area += dt * (pts[i].temp + pts[i - 1].temp) / 2;
   }
-  // 扣除入豆溫度（0:00 起始溫度）以下的矩形面積，只算「超出入豆溫度」的部分，
+  // 扣除起始溫度（入豆溫度／Mini500 則為回溫點溫度）以下、一路到 0 度的矩形面積，只算「超出起始溫度」的部分，
   // 避免每次烘焙起始溫度不同時，這段基準值把總熱能的數字灌高、失去比較意義
   var chargeTemp = pts[0].temp;
   var totalT = pts[pts.length - 1].t - pts[0].t;
@@ -897,7 +1048,7 @@ function computeSummary(){
   }
 
   // 總熱能：溫度曲線下面積
-  var energy = computeThermalEnergy(roast.tempLog);
+  var energy = computeThermalEnergy(roast.tempLog, roast.crackEvents, roast.machineName);
   if (energy != null){
     summary.energyText = energy.toFixed(0) + ' °C·分';
   }
@@ -910,11 +1061,19 @@ function computeSummary(){
 // 範圍內（例如 02:41、03:03 都在 20 秒內能配到 03:00 觸發的事件），就會讓同一筆事件被重複帶入兩欄，
 // 例如「02:41 只有手動記溫」卻被誤帶入 03:00 的風速值。改成先列出所有「事件—欄位」的合法配對，
 // 依距離由近到遠排序，再依序搶配（一個事件配一欄、一欄配一個事件），確保不會重複。
-function buildEventColumnMap(cols, triggeredLog, prefix, tolerance){
+// resetAt（Mini500 專用）：回溫點那一欄單純是溫度事件紀錄，不參與風門／火力配對。
+function buildEventColumnMap(cols, triggeredLog, prefix, tolerance, resetAt){
   var candidates = [];
+  var allEvents = [];
   triggeredLog.forEach(function(ev){
     if (ev.label.indexOf(prefix) !== 0) return;
+    // 回溫點當下（或非常接近回溫點）就生效的提醒，畫面上已經由回溫點後新增的「00:00」欄位直接帶出數值，
+    // 這裡完全不再參與配對，避免因為回溫點欄位、00:00 欄位都不能配對，被硬塞到回溫點前後的欄位、造成誤導
+    if (resetAt != null && Math.abs(ev.t - resetAt) <= tolerance) return;
+    allEvents.push(ev);
     cols.forEach(function(p, idx){
+      if (p.synthetic) return; // 回溫點後新增的「00:00」欄位是帶入既有範本值的展示欄，不參與事件配對，避免搶走真正的紀錄
+      if (resetAt != null && p.t === resetAt) return; // 回溫點欄位單純記錄溫度事件，不標記風門／火力
       var diff = Math.abs(ev.t - p.t);
       if (diff <= tolerance) candidates.push({ ev: ev, idx: idx, diff: diff });
     });
@@ -929,6 +1088,31 @@ function buildEventColumnMap(cols, triggeredLog, prefix, tolerance){
     usedEvents.push(c.ev);
     map[c.idx] = c.ev.label.replace(prefix + ' ', '');
   });
+
+  // 若兩筆事件時間太接近、搶著配同一欄，容許誤差內較遠的那筆會完全配不到欄位而消失不見。
+  // 這裡讓還沒配到欄位的事件，往它理想欄位（不限容許誤差）的「前一欄」找還沒被用掉的欄位補記錄，
+  // 這樣較早發生的那筆會被記到前一格，而不是整筆不見
+  allEvents.forEach(function(ev){
+    if (usedEvents.indexOf(ev) !== -1) return;
+    var nearestIdx = -1, nearestDiff = Infinity;
+    cols.forEach(function(p, idx){
+      if (p.synthetic) return;
+      if (resetAt != null && p.t === resetAt) return;
+      var diff = Math.abs(ev.t - p.t);
+      if (diff < nearestDiff){ nearestDiff = diff; nearestIdx = idx; }
+    });
+    if (nearestIdx === -1) return;
+    for (var idx2 = nearestIdx; idx2 >= 0; idx2--){
+      if (cols[idx2].synthetic) continue;
+      if (resetAt != null && cols[idx2].t === resetAt) continue;
+      if (usedCols[idx2]) continue;
+      usedCols[idx2] = true;
+      usedEvents.push(ev);
+      map[idx2] = ev.label.replace(prefix + ' ', '');
+      break;
+    }
+  });
+
   return map;
 }
 
@@ -938,11 +1122,11 @@ function buildEventColumnMap(cols, triggeredLog, prefix, tolerance){
 // 改成動態往回找離「目前時間－30秒」最接近（且在容許誤差內）的欄位，跳過事件（爆點）欄位當基準
 function compute30sRow(cols, isCrackCol){
   return cols.map(function(p, i){
-    if (isCrackCol(p.t)) return null;
+    if (isCrackCol(p.t) || p.synthetic) return null;
     var target = p.t - 30;
     var best = null, bestDiff = 15; // 只在離「30秒前」15秒內才算數
     for (var k = i - 1; k >= 0; k--){
-      if (isCrackCol(cols[k].t)) continue;
+      if (isCrackCol(cols[k].t) || cols[k].synthetic) continue;
       var diff = Math.abs(cols[k].t - target);
       if (diff < bestDiff){ bestDiff = diff; best = cols[k]; }
     }
@@ -964,7 +1148,7 @@ function compute60sRow(cols, isCrackCol){
   for (var m = 60; m <= maxT + 25; m += 60){
     var bestIdx = -1, bestDiff = 25; // 只在離整分鐘 25 秒內才算「接近整分鐘」
     cols.forEach(function(p, idx){
-      if (isCrackCol(p.t) || usedIdx[idx]) return;
+      if (isCrackCol(p.t) || p.synthetic || usedIdx[idx]) return;
       var diff = Math.abs(p.t - m);
       if (diff < bestDiff){ bestDiff = diff; bestIdx = idx; }
     });
@@ -972,11 +1156,11 @@ function compute60sRow(cols, isCrackCol){
   }
 
   return cols.map(function(p, i){
-    if (isCrackCol(p.t) || !pickedIdx[i]) return null;
+    if (isCrackCol(p.t) || p.synthetic || !pickedIdx[i]) return null;
     var target = p.t - 60;
     var best = null, bestDiff = 20;
     for (var k = i - 1; k >= 0; k--){
-      if (isCrackCol(cols[k].t)) continue;
+      if (isCrackCol(cols[k].t) || cols[k].synthetic) continue;
       var diff = Math.abs(cols[k].t - target);
       if (diff < bestDiff){ bestDiff = diff; best = cols[k]; }
     }
@@ -985,12 +1169,42 @@ function compute60sRow(cols, isCrackCol){
   });
 }
 
+// 事件時間軸欄位：一般用溫度紀錄（tempLog）依時間排序後的每一點當一欄；
+// Mini500 若已經按過「回溫點」，會在回溫點那一欄後面多插入一欄代表「歸零後的 00:00」，
+// 帶入回溫點當下即將生效的火力設定，方便直接看到重新計時後的起點（這欄是展示用，不是真正的溫度紀錄，
+// 30"/60" 升溫與風門／火力配對都會跳過它）
+function buildLogCols(){
+  var cols = roast.tempLog.slice().sort(function(a, b){ return a.t - b.t; });
+  if (roast.machineName === 'Mini500' && roast.resetMarker){
+    var rm = roast.resetMarker;
+    var idx = -1;
+    for (var i = 0; i < cols.length; i++){
+      if (cols[i].t === rm.t) idx = i;
+    }
+    if (idx !== -1){
+      var marker = { t: rm.t, temp: rm.temp, synthetic: true, power: rm.power };
+      cols = cols.slice(0, idx + 1).concat([marker], cols.slice(idx + 1));
+    }
+  }
+  return cols;
+}
+
+// 欄位「時間」列要顯示的文字：回溫點之後（不含回溫點自己那一欄）都改成相對於回溫點重新歸零的時間，
+// 回溫點之前的欄位、以及回溫點自己那一欄，維持顯示原本的絕對累計時間
+function displayColTime(p){
+  if (p.synthetic) return '00:00';
+  if (roast.machineName === 'Mini500' && roast.resetAt != null && p.t > roast.resetAt){
+    return formatTime(p.t - roast.resetAt);
+  }
+  return formatTime(p.t);
+}
+
 // 橫向表格：時間為欄，時間/溫度/30秒RoR/60秒RoR/風速/火力為列；targetId 可指定烘豆中或結果頁的表格
 // 烘豆中的表格（liveLogTableBody）額外加一列刪除按鈕，方便刪掉新增錯誤的溫度紀錄
 function renderLogTable(targetId){
   var isLive = (targetId === 'liveLogTableBody');
   var body = document.getElementById(targetId || 'logTableBody');
-  var cols = roast.tempLog.slice().sort(function(a, b){ return a.t - b.t; });
+  var cols = buildLogCols();
   if (cols.length === 0){
     body.innerHTML = '<tr><th></th><td class="log-table__empty">尚無溫度紀錄</td></tr>';
     return;
@@ -999,53 +1213,63 @@ function renderLogTable(targetId){
   var rows = '';
   var crackTimes = (roast.crackEvents || []).map(function(e){ return e.t; });
   function isCrackCol(t){ return crackTimes.indexOf(t) !== -1; }
-  function tdClass(base, t){
+  // 回溫點後新增的「00:00」欄位單純是展示用的參考欄，不是真正的事件，樣式維持跟一般欄位一樣，不特別醒目
+  function tdClass(base, p){
     var classes = [];
     if (base) classes.push(base);
-    if (isCrackCol(t)) classes.push('lt-event-col');
+    if (!p.synthetic && isCrackCol(p.t)) classes.push('lt-event-col');
     return classes.length ? (' class="' + classes.join(' ') + '"') : '';
   }
 
   rows += '<tr><th>時間</th>' + cols.map(function(p){
-    return '<td' + tdClass(null, p.t) + '>' + formatTime(p.t) + '</td>';
+    return '<td' + tdClass(null, p) + '>' + displayColTime(p) + '</td>';
   }).join('') + '</tr>';
 
   rows += '<tr><th>溫度</th>' + cols.map(function(p){
-    return '<td' + tdClass('lt-temp', p.t) + '>' + p.temp + '</td>';
+    return '<td' + tdClass('lt-temp', p) + '>' + p.temp + '</td>';
   }).join('') + '</tr>';
 
   var row30 = compute30sRow(cols, isCrackCol);
   rows += '<tr><th>30&quot;</th>' + cols.map(function(p, i){
     var v = row30[i];
-    if (v == null) return '<td' + tdClass(null, p.t) + '></td>';
-    return '<td' + tdClass('lt-ror', p.t) + '>' + v + '</td>';
+    if (v == null) return '<td' + tdClass(null, p) + '></td>';
+    return '<td' + tdClass('lt-ror', p) + '>' + v + '</td>';
   }).join('') + '</tr>';
 
   var row60 = compute60sRow(cols, isCrackCol);
   rows += '<tr><th>60&quot;</th>' + cols.map(function(p, i){
     var v = row60[i];
-    if (v == null) return '<td' + tdClass(null, p.t) + '></td>';
-    return '<td' + tdClass('lt-ror lt-ror-strong', p.t) + '>' + v + '</td>';
+    if (v == null) return '<td' + tdClass(null, p) + '></td>';
+    return '<td' + tdClass('lt-ror lt-ror-strong', p) + '>' + v + '</td>';
   }).join('') + '</tr>';
 
+  // 回溫點後新增的「00:00」參考欄不是事件，這裡留空，不標注文字
   rows += '<tr><th>事件</th>' + cols.map(function(p){
+    if (p.synthetic) return '<td></td>';
     var ev = (roast.crackEvents || []).find(function(e){ return e.t === p.t; });
-    return '<td' + tdClass(ev ? 'lt-event-cell' : null, p.t) + '>' + (ev ? escapeHtml(ev.label) : '') + '</td>';
+    return '<td' + tdClass(ev ? 'lt-event-cell' : null, p) + '>' + (ev ? escapeHtml(ev.label) : '') + '</td>';
   }).join('') + '</tr>';
 
-  var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風速', 20);
-  rows += '<tr><th>風速</th>' + cols.map(function(p, i){
-    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(windMap[i] || '') + '</td>';
+  // Mini500 用「風門」取代「風速」（事件時間軸的欄位名稱與比對前綴都要跟著換）
+  // 「回溫點」那一欄單純是溫度事件紀錄，不標記風門／火力；回溫點後新增的「00:00」參考欄也不參與配對
+  var windLabel = (roast.machineName === 'Mini500') ? '風門' : '風速';
+  var windMap = buildEventColumnMap(cols, roast.triggeredLog, windLabel, 20, roast.resetAt);
+  rows += '<tr><th>' + windLabel + '</th>' + cols.map(function(p, i){
+    if (p.synthetic) return '<td></td>';
+    return '<td' + tdClass(null, p) + '>' + escapeHtml(windMap[i] || '') + '</td>';
   }).join('') + '</tr>';
 
-  var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20);
+  var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20, roast.resetAt);
   rows += '<tr><th>火力</th>' + cols.map(function(p, i){
-    return '<td' + tdClass(null, p.t) + '>' + escapeHtml(powerMap[i] || '') + '</td>';
+    // 回溫點後新增的「00:00」參考欄純粹帶入即將生效的火力值，跟一般欄位一樣的樣式即可，不用特別加粗或標色
+    if (p.synthetic) return '<td>' + escapeHtml(p.power || '') + '</td>';
+    return '<td' + tdClass(null, p) + '>' + escapeHtml(powerMap[i] || '') + '</td>';
   }).join('') + '</tr>';
 
   if (isLive){
     rows += '<tr><th>刪除</th>' + cols.map(function(p){
-      return '<td' + tdClass(null, p.t) + '><button type="button" class="lt-del-btn" data-t="' + p.t + '" aria-label="刪除這筆溫度紀錄">✕</button></td>';
+      if (p.synthetic) return '<td></td>';
+      return '<td' + tdClass(null, p) + '><button type="button" class="lt-del-btn" data-t="' + p.t + '" aria-label="刪除這筆溫度紀錄">✕</button></td>';
     }).join('') + '</tr>';
   }
 
@@ -1065,6 +1289,13 @@ function deleteTempPoint(t){
     if (ev.label === '一爆起' && roast.firstCrackTime === t){
       roast.firstCrackTime = null;
       document.getElementById('devReadout').hidden = true;
+    }
+    // Mini500：如果刪掉的剛好是「回溫點」那筆紀錄，連帶取消歸零狀態，畫面計時器改回顯示絕對累計時間，
+    // 事件時間軸也不再顯示回溫點後新增的「00:00」欄位
+    if (ev.label === '回溫點' && roast.resetAt === t){
+      roast.resetAt = null;
+      roast.resetMarker = null;
+      roast.timeOffset = 0;
     }
   });
   drawLiveCurve();
@@ -1111,7 +1342,10 @@ function tick(){
   resumeAudioCtx(); // 每秒檢查一次，iPhone 背景／閒置後 AudioContext 被 suspend 時可以盡快恢復
   var elapsed = roast.pausedElapsed + Math.floor((Date.now() - roast.startAt) / 1000);
   roast.elapsed = elapsed;
-  document.getElementById('timerDisplay').textContent = formatTime(elapsed);
+  // 畫面上顯示的計時器：Mini500 按下「回溫點」後會歸零重新計算（見 timeOffset），
+  // 溫度紀錄／事件時間軸內部仍用未歸零的絕對累計秒數（elapsed）當作時間座標，兩者不會互相影響
+  var dispElapsed = elapsed - (roast.timeOffset || 0);
+  document.getElementById('timerDisplay').textContent = formatTime(dispElapsed);
 
   if (roast.firstCrackTime != null){
     var devTime = elapsed - roast.firstCrackTime;
@@ -1119,18 +1353,18 @@ function tick(){
     document.getElementById('devReadout').textContent = '發展時間 ' + formatTime(devTime) + '（' + devPercent.toFixed(1) + '%）';
   }
 
-  // 提前3秒／2秒／1秒的「嘟」提示音，讓人先準備看溫度
-  if (elapsed > 0 && (elapsed % 30 === 27 || elapsed % 30 === 28 || elapsed % 30 === 29) && roast.lastDuduAt !== elapsed){
-    roast.lastDuduAt = elapsed;
+  // 提前3秒／2秒／1秒的「嘟」提示音，讓人先準備看溫度（依畫面上顯示的時間為準，回溫點歸零後 30 秒節奏也一併重新起算）
+  if (dispElapsed > 0 && (dispElapsed % 30 === 27 || dispElapsed % 30 === 28 || dispElapsed % 30 === 29) && roast.lastDuduAt !== dispElapsed){
+    roast.lastDuduAt = dispElapsed;
     beep(600, 90, 0.55);
   }
 
   // 第30秒整的「嗶」聲，並跳出溫度輸入
   // 若此時「手動記溫／一爆起／一爆止／二爆起／二爆止」的溫度輸入正在進行中，先不要蓋掉它，
   // 等那筆溫度填完送出後，再補顯示這次的30秒溫度提示
-  var onGridMark = (elapsed > 0 && elapsed % 30 === 0);
-  if (onGridMark && roast.lastPromptAt !== elapsed){
-    roast.lastPromptAt = elapsed;
+  var onGridMark = (dispElapsed > 0 && dispElapsed % 30 === 0);
+  if (onGridMark && roast.lastPromptAt !== dispElapsed){
+    roast.lastPromptAt = dispElapsed;
     beep(1000, 220, 0.6);
     if (document.getElementById('tempPrompt').hidden){
       roast.pendingCrackLabel = null;
@@ -1175,6 +1409,7 @@ function tick(){
 // ---------- 事件綁定 ----------
 document.addEventListener('DOMContentLoaded', function(){
   renderPlanEventList();
+  renderMiniPlanEventList();
 
   var machineSelect = document.getElementById('machineSelect');
   machineSelect.addEventListener('change', function(){
@@ -1184,6 +1419,7 @@ document.addEventListener('DOMContentLoaded', function(){
     document.getElementById('panel-plan').hidden = !selected;
     document.getElementById('planFixedFields').hidden = !isMini;
     document.getElementById('planCustomSection').hidden = !(selected && !isMini);
+    document.getElementById('planMiniCustomSection').hidden = !(selected && isMini);
     renderPlanPresetOptions();
     updateStartButton();
     applyRoastPlan();
@@ -1197,7 +1433,7 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   // 時間（分/秒）只允許輸入數字
-  ['newPlanEventMin', 'newPlanEventSec'].forEach(function(id){
+  ['newPlanEventMin', 'newPlanEventSec', 'newMiniFireMin', 'newMiniFireSec', 'newMiniDamperMin', 'newMiniDamperSec'].forEach(function(id){
     document.getElementById(id).addEventListener('input', function(){
       this.value = this.value.replace(/[^0-9]/g, '');
     });
@@ -1245,6 +1481,55 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('planEventListWind').addEventListener('click', handlePlanEventDelete);
   document.getElementById('planEventListFire').addEventListener('click', handlePlanEventDelete);
 
+  // 新增自訂操作提醒（Mini500：火力，時間＋0.1-3.0 數值）
+  document.getElementById('btnAddMiniFireEvent').addEventListener('click', function(){
+    var min = parseInt(document.getElementById('newMiniFireMin').value || '0', 10);
+    var sec = parseInt(document.getElementById('newMiniFireSec').value || '0', 10);
+    var value = parseFloat(document.getElementById('newMiniFireValue').value);
+    var err = document.getElementById('miniFireFormError');
+    var seconds = (min || 0) * 60 + (sec || 0);
+    if (seconds < 0){ err.textContent = '請輸入正確的時間'; return; }
+    if (isNaN(value) || value < 0.1 || value > 3.0){ err.textContent = '請輸入 0.1-3.0 的數值'; return; }
+    var isDuplicate = state.miniFireEvents.some(function(ev){ return ev.seconds === seconds; });
+    if (isDuplicate){ err.textContent = '這個時間已經設定過火力，請刪除原本的設定或改用其他時間'; return; }
+    err.textContent = '';
+    state.miniFireEvents.push({ id: uid(), seconds: seconds, value: clampPowerDecimal(value).toFixed(1) });
+    renderMiniPlanEventList();
+    document.getElementById('newMiniFireMin').value = '';
+    document.getElementById('newMiniFireSec').value = '';
+    document.getElementById('newMiniFireValue').value = '';
+  });
+
+  // 新增自訂操作提醒（Mini500：風門，可選錨定事件＋時間＋風門選項）
+  document.getElementById('btnAddMiniDamperEvent').addEventListener('click', function(){
+    var anchor = document.getElementById('newMiniDamperAnchor').value;
+    var min = parseInt(document.getElementById('newMiniDamperMin').value || '0', 10);
+    var sec = parseInt(document.getElementById('newMiniDamperSec').value || '0', 10);
+    var value = document.getElementById('newMiniDamperValue').value;
+    var err = document.getElementById('miniDamperFormError');
+    var seconds = (min || 0) * 60 + (sec || 0);
+    if (seconds < 0){ err.textContent = '請輸入正確的時間'; return; }
+    if (DAMPER_OPTIONS.indexOf(value) === -1){ err.textContent = '請選擇風門'; return; }
+    var isDuplicate = state.miniDamperEvents.some(function(ev){ return (ev.anchor || '') === anchor && ev.seconds === seconds; });
+    if (isDuplicate){ err.textContent = '這個時間已經設定過風門，請刪除原本的設定或改用其他時間'; return; }
+    err.textContent = '';
+    state.miniDamperEvents.push({ id: uid(), anchor: anchor, seconds: seconds, value: value });
+    renderMiniPlanEventList();
+    document.getElementById('newMiniDamperMin').value = '';
+    document.getElementById('newMiniDamperSec').value = '';
+  });
+
+  // 刪除自訂操作提醒（Mini500 火力／風門共用同一個刪除按鈕樣式）
+  function handleMiniEventDelete(e){
+    var btn = e.target.closest('.event-list__del');
+    if (!btn) return;
+    state.miniFireEvents = state.miniFireEvents.filter(function(ev){ return ev.id !== btn.dataset.id; });
+    state.miniDamperEvents = state.miniDamperEvents.filter(function(ev){ return ev.id !== btn.dataset.id; });
+    renderMiniPlanEventList();
+  }
+  document.getElementById('planMiniFireList').addEventListener('click', handleMiniEventDelete);
+  document.getElementById('planMiniDamperList').addEventListener('click', handleMiniEventDelete);
+
   // 開始烘豆
   document.getElementById('btnStartRoast').addEventListener('click', function(){
     var machineName = machineSelect.value;
@@ -1254,12 +1539,37 @@ document.addEventListener('DOMContentLoaded', function(){
     try { primeAudio(); } catch (e){}
     try { primeSpeech(); } catch (e){}
 
+    // Mini500 沒有像 SR540／SR800 那樣的自訂風速／火力提醒清單，改用設定頁「自訂操作提醒」裡
+    // 分開自訂的火力／風門清單（含依烘前重量自動帶入的回溫點火力、2:00 火力、8:00 火力）；
+    // 這些提醒屬於「回溫點之後」才生效的時間軸，開始烘豆當下先不排入 roast.events，
+    // 只記錄成範本（miniScheduleTemplate），等按下「回溫點」時才依新的 0:00 正式排入（見 tempPromptForm 的回溫點分支）。
+    // 風門提醒若有錨定事件（回溫點／乾燥終點／…），一樣要等事件真的發生時才動態排程
+    var miniScheduleTemplate = [];
+    var events;
+    if (machineName === 'Mini500'){
+      state.miniFireEvents.forEach(function(ev){
+        miniScheduleTemplate.push({ label: '火力 ' + ev.value, baseSeconds: ev.seconds });
+      });
+      state.miniDamperEvents.forEach(function(ev){
+        if (ev.anchor) return;
+        miniScheduleTemplate.push({ label: '風門 ' + ev.value, baseSeconds: ev.seconds });
+      });
+      events = [];
+    } else {
+      events = state.planEvents.map(function(ev){
+        return { label: ev.type + ' ' + ev.value, seconds: ev.seconds, triggered: false };
+      });
+    }
+
     roast = {
       machineName: machineName,
       dateStr: new Date().toLocaleString('zh-TW', { hour12: false }),
       startAt: Date.now(),
       pausedElapsed: 0,
       elapsed: 0,
+      timeOffset: 0, // Mini500 按下「回溫點」後，會把這個值設成當下的 elapsed，讓畫面計時器與提醒排程都以此為新的 0:00
+      resetAt: null, // 回溫點發生時的絕對累計秒數（尚未按下時為 null）
+      resetMarker: null, // 回溫點後在事件時間軸新增的「00:00」欄位資料
       running: true,
       lastPromptAt: 0,
       lastDuduAt: 0,
@@ -1271,6 +1581,10 @@ document.addEventListener('DOMContentLoaded', function(){
       pending30Mark: false,
       firstCrackTime: null,
       pendingConfirms: [],
+      miniScheduleTemplate: miniScheduleTemplate,
+      pendingAnchorEvents: machineName === 'Mini500' ? state.miniDamperEvents.filter(function(ev){ return !!ev.anchor; }).map(function(ev){
+        return { anchor: ev.anchor, offsetSeconds: ev.seconds, value: ev.value, scheduled: false };
+      }) : [],
       weightBefore: parseFloat(document.getElementById('weightBefore').value) || null,
       greenBean: {
         origin: document.getElementById('beanOrigin').value.trim(),
@@ -1291,14 +1605,10 @@ document.addEventListener('DOMContentLoaded', function(){
       },
       plan: {
         chargeTemp: document.getElementById('planChargeTemp').value.trim(),
-        damper000: document.getElementById('planDamper000').value.trim(),
-        power000: document.getElementById('planPower000').value.trim(),
-        power200: document.getElementById('planPower200').value.trim(),
-        power800: document.getElementById('planPower800').value.trim()
+        powerInit: document.getElementById('planPowerInit').value.trim(),
+        damperInit: document.getElementById('planDamperInit').value
       },
-      events: state.planEvents.map(function(ev){
-        return { label: ev.type + ' ' + ev.value, seconds: ev.seconds, triggered: false };
-      })
+      events: events
     };
 
     document.getElementById('appbarTitle').textContent = '烘豆小助手';
@@ -1310,6 +1620,9 @@ document.addEventListener('DOMContentLoaded', function(){
     document.getElementById('rorReadout').textContent = 'RoR（升溫速率）－';
     document.getElementById('devReadout').hidden = true;
     document.querySelectorAll('.crack-btn').forEach(function(btn){ btn.disabled = false; });
+    // Mini500 才顯示「回溫點／乾燥終點／第一聲」，並把「調整風速」按鈕換成「調整風門」
+    document.querySelectorAll('.crack-btn--mini').forEach(function(btn){ btn.hidden = (machineName !== 'Mini500'); });
+    document.getElementById('btnChangeFan').textContent = (machineName === 'Mini500') ? '調整風門' : '調整風速';
     document.getElementById('weightAfter').value = '';
     document.getElementById('roastLevelBean').value = '';
     document.getElementById('roastLevelCoarse').value = '';
@@ -1329,6 +1642,16 @@ document.addEventListener('DOMContentLoaded', function(){
     }
     if (!isNaN(startTemp)){
       roast.tempLog.push({ t: 0, temp: startTemp });
+    }
+
+    // Mini500：設定頁的「初始火力」「初始風門」是開始烘豆當下就生效的固定設定（不是需要確認的提醒），
+    // 直接記錄在事件時間軸最左邊（0:00）那一欄，跟「初始火力」的需求對應
+    if (machineName === 'Mini500'){
+      var initPowerVal = document.getElementById('planPowerInit').value.trim();
+      var initDamperVal = document.getElementById('planDamperInit').value;
+      var seedTemp = isNaN(startTemp) ? null : startTemp;
+      if (initPowerVal) roast.triggeredLog.push({ t: 0, label: '火力 ' + initPowerVal, temp: seedTemp });
+      if (initDamperVal) roast.triggeredLog.push({ t: 0, label: '風門 ' + initDamperVal, temp: seedTemp });
     }
 
     showScreen('roast');
@@ -1373,6 +1696,49 @@ document.addEventListener('DOMContentLoaded', function(){
     var input = document.getElementById('tempPromptInput');
     var val = parseFloat(input.value);
     if (isNaN(val)) return;
+
+    // Mini500「回溫點」：畫面上的計時器歸零重新開始計算，但溫度紀錄與事件時間軸都不清空，
+    // 回溫點本身的溫度會被記錄下來（接續在原本的紀錄之後）；設定頁「自訂操作提醒」裡的火力／風門
+    // 提醒範本（miniScheduleTemplate）到這一刻才正式依新的 0:00 排入排程，2:00／8:00 火力等都是
+    // 從這裡開始重新算起
+    if (roast.pendingCrackLabel === '回溫點'){
+      var tpT = roast.elapsed;
+      roast.tempLog.push({ t: tpT, temp: val });
+      roast.crackEvents.push({ t: tpT, label: '回溫點', temp: val });
+
+      // 找出「0:00 火力」的範本值（回溫點火力），連同回溫點溫度一起帶入事件時間軸新增的「00:00」欄位，
+      // 讓使用者能立刻看到歸零後即將生效的火力設定；實際的提醒／確認寫入仍會照常在稍後另外跑一次
+      var zeroFireTpl = (roast.miniScheduleTemplate || []).filter(function(t){
+        return t.baseSeconds === 0 && t.label.indexOf('火力 ') === 0;
+      })[0];
+      roast.resetAt = tpT;
+      roast.resetMarker = {
+        t: tpT,
+        temp: val,
+        power: zeroFireTpl ? zeroFireTpl.label.slice(3) : (roast.plan.powerInit || '')
+      };
+
+      roast.pendingConfirms.forEach(function(item){ clearTimeout(item.timer); });
+      roast.pendingConfirms = [];
+      roast.firstCrackTime = null;
+      roast.lastPromptAt = 0;
+      roast.lastDuduAt = 0;
+      roast.timeOffset = tpT;
+      (roast.miniScheduleTemplate || []).forEach(function(tpl){
+        roast.events.push({ label: tpl.label, seconds: roast.timeOffset + tpl.baseSeconds, baseSeconds: tpl.baseSeconds, triggered: false });
+      });
+      document.getElementById('devReadout').hidden = true;
+      var usedTpBtn = document.querySelector('.crack-btn[data-label="回溫點"]');
+      if (usedTpBtn) usedTpBtn.disabled = true;
+      roast.pendingCrackLabel = null;
+      hideTempPrompt();
+      scheduleAnchoredDamperEvents('回溫點', tpT);
+      drawLiveCurve();
+      updateRorReadout();
+      renderConfirmPanel();
+      return;
+    }
+
     var elapsed = roast.elapsed;
     roast.tempLog.push({ t: elapsed, temp: val });
     if (roast.pendingCrackLabel){
@@ -1385,6 +1751,8 @@ document.addEventListener('DOMContentLoaded', function(){
       var usedBtn = document.querySelector('.crack-btn[data-label="' + crackLabel + '"]');
       if (usedBtn) usedBtn.disabled = true;
       roast.pendingCrackLabel = null;
+      // Mini500：乾燥終點／第一聲／一爆起／一爆止／二爆起／二爆止 也可能是風門提醒的錨定事件
+      if (roast.machineName === 'Mini500') scheduleAnchoredDamperEvents(crackLabel, elapsed);
     }
     hideTempPrompt();
     if (roast.pendingFinish){
@@ -1415,46 +1783,109 @@ document.addEventListener('DOMContentLoaded', function(){
     deleteTempPoint(parseFloat(btn.dataset.t));
   });
 
-  // 新增風速／新增火力：烘豆過程中隨時新增一筆風速或火力紀錄，輸入框限 1-9，預設帶入目前數值，可用 -/+ 按鈕調整
+  // 烘豆過程中隨時新增一筆風速／風門／火力紀錄，預設帶入目前數值，可用 -/+ 按鈕調整：
+  // SR540／SR800 維持原本風速／火力 1-9 整數；Mini500 改成風門（固定選項清單）／火力（0.1-3.0 小數）
   var adjustType = null;
-  function openAdjustPanel(type, label){
+  var adjustMode = 'intStep'; // 'intStep'（1-9整數）／'damper'（風門選項清單）／'decimalPower'（0.1-3.0小數）
+  function openAdjustPanel(type, label, mode){
     adjustType = type;
-    document.getElementById('adjustPanelLabel').textContent = label + '（1-9）';
-    document.getElementById('adjustPanelValue').value = String(getCurrentAdjustValue(type));
+    adjustMode = mode;
+    var valueEl = document.getElementById('adjustPanelValue');
+    if (mode === 'damper'){
+      document.getElementById('adjustPanelLabel').textContent = label;
+      valueEl.value = getCurrentDamperValue();
+      valueEl.readOnly = true;
+      valueEl.inputMode = 'none';
+      valueEl.removeAttribute('maxlength');
+      valueEl.removeAttribute('pattern');
+    } else if (mode === 'decimalPower'){
+      document.getElementById('adjustPanelLabel').textContent = label + '（0.1-3.0）';
+      valueEl.value = getCurrentPowerDecimal();
+      valueEl.readOnly = false;
+      valueEl.inputMode = 'decimal';
+      valueEl.removeAttribute('maxlength');
+      valueEl.setAttribute('pattern', '[0-9.]*');
+    } else {
+      document.getElementById('adjustPanelLabel').textContent = label + '（1-9）';
+      valueEl.value = String(getCurrentAdjustValue(type));
+      valueEl.readOnly = false;
+      valueEl.inputMode = 'numeric';
+      valueEl.setAttribute('maxlength', '1');
+      valueEl.setAttribute('pattern', '[1-9]');
+    }
     var panel = document.getElementById('adjustPanel');
     panel.hidden = false;
     panel.classList.add('capture-panel--active');
   }
-  document.getElementById('btnChangeFan').addEventListener('click', function(){ openAdjustPanel('風速', '調整風速'); });
-  document.getElementById('btnChangePower').addEventListener('click', function(){ openAdjustPanel('火力', '調整火力'); });
+  document.getElementById('btnChangeFan').addEventListener('click', function(){
+    if (roast && roast.machineName === 'Mini500'){
+      openAdjustPanel('風門', '調整風門', 'damper');
+    } else {
+      openAdjustPanel('風速', '調整風速', 'intStep');
+    }
+  });
+  document.getElementById('btnChangePower').addEventListener('click', function(){
+    if (roast && roast.machineName === 'Mini500'){
+      openAdjustPanel('火力', '調整火力', 'decimalPower');
+    } else {
+      openAdjustPanel('火力', '調整火力', 'intStep');
+    }
+  });
 
   document.getElementById('adjustPanelValue').addEventListener('input', function(){
     var el = document.getElementById('adjustPanelValue');
+    if (adjustMode === 'damper') return; // 風門只能用 +/- 切換選項，不開放直接輸入
+    if (adjustMode === 'decimalPower'){
+      el.value = el.value.replace(/[^0-9.]/g, '');
+      return;
+    }
     var digits = el.value.replace(/[^1-9]/g, '');
     el.value = digits.slice(-1);
   });
 
   document.getElementById('adjustPanelMinus').addEventListener('click', function(){
     var el = document.getElementById('adjustPanelValue');
-    el.value = String(clampAdjustValue((parseInt(el.value, 10) || 5) - 1));
+    if (adjustMode === 'damper'){
+      el.value = stepDamperValue(el.value, -1);
+    } else if (adjustMode === 'decimalPower'){
+      el.value = clampPowerDecimal((parseFloat(el.value) || 1) - 0.1).toFixed(1);
+    } else {
+      el.value = String(clampAdjustValue((parseInt(el.value, 10) || 5) - 1));
+    }
   });
   document.getElementById('adjustPanelPlus').addEventListener('click', function(){
     var el = document.getElementById('adjustPanelValue');
-    el.value = String(clampAdjustValue((parseInt(el.value, 10) || 5) + 1));
+    if (adjustMode === 'damper'){
+      el.value = stepDamperValue(el.value, 1);
+    } else if (adjustMode === 'decimalPower'){
+      el.value = clampPowerDecimal((parseFloat(el.value) || 1) + 0.1).toFixed(1);
+    } else {
+      el.value = String(clampAdjustValue((parseInt(el.value, 10) || 5) + 1));
+    }
   });
 
   document.getElementById('btnAdjustCancel').addEventListener('click', function(){
     adjustType = null;
+    adjustMode = 'intStep';
     hideAdjustPanel();
   });
 
   document.getElementById('btnAdjustSubmit').addEventListener('click', function(){
     if (!roast || !adjustType) return;
-    var val = clampAdjustValue(document.getElementById('adjustPanelValue').value);
+    var raw = document.getElementById('adjustPanelValue').value;
+    var val;
+    if (adjustMode === 'damper'){
+      val = (DAMPER_OPTIONS.indexOf(raw) !== -1) ? raw : getCurrentDamperValue();
+    } else if (adjustMode === 'decimalPower'){
+      val = clampPowerDecimal(raw).toFixed(1);
+    } else {
+      val = clampAdjustValue(raw);
+    }
     var elapsed = roast.elapsed;
     var nearestTemp = findNearestTemp(roast.tempLog, elapsed);
     roast.triggeredLog.push({ t: elapsed, label: adjustType + ' ' + val, temp: nearestTemp });
     adjustType = null;
+    adjustMode = 'intStep';
     hideAdjustPanel();
     drawLiveCurve();
   });
@@ -1514,14 +1945,17 @@ document.addEventListener('DOMContentLoaded', function(){
   function buildExportTableRows(cols){
     var crackTimes = (roast.crackEvents || []).map(function(e){ return e.t; });
     function isCrackCol(t){ return crackTimes.indexOf(t) !== -1; }
+    // 回溫點後新增的「00:00」參考欄不是事件，不用醒目底色標示
+    function crackFlag(p){ return !p.synthetic && isCrackCol(p.t); }
+    var resetAt = roast.resetAt;
     var rowDefs = [
-      { label: '時間', cells: cols.map(function(p){ return { text: formatTime(p.t), crack: isCrackCol(p.t) }; }) },
-      { label: '溫度', cells: cols.map(function(p){ return { text: String(p.temp), crack: isCrackCol(p.t), style: 'temp' }; }) },
+      { label: '時間', cells: cols.map(function(p){ return { text: displayColTime(p), crack: crackFlag(p) }; }) },
+      { label: '溫度', cells: cols.map(function(p){ return { text: String(p.temp), crack: crackFlag(p), style: 'temp' }; }) },
       { label: '30"', cells: (function(){
           var row30 = compute30sRow(cols, isCrackCol);
           return cols.map(function(p, i){
             var v = row30[i];
-            if (v == null) return { text: '', crack: isCrackCol(p.t) };
+            if (v == null) return { text: '', crack: crackFlag(p) };
             return { text: String(v), crack: false, style: 'ror' };
           });
         })() },
@@ -1529,21 +1963,32 @@ document.addEventListener('DOMContentLoaded', function(){
           var row60 = compute60sRow(cols, isCrackCol);
           return cols.map(function(p, i){
             var v = row60[i];
-            if (v == null) return { text: '', crack: isCrackCol(p.t) };
+            if (v == null) return { text: '', crack: crackFlag(p) };
             return { text: String(v), crack: false, style: 'ror' };
           });
         })() },
+      // 回溫點後新增的「00:00」參考欄不是事件，留空不標注文字
       { label: '事件', cells: cols.map(function(p){
+          if (p.synthetic) return { text: '', crack: false };
           var ev = (roast.crackEvents || []).find(function(e){ return e.t === p.t; });
           return { text: ev ? ev.label : '', crack: !!ev, style: ev ? 'event' : null };
         }) },
-      { label: '風速', cells: (function(){
-          var windMap = buildEventColumnMap(cols, roast.triggeredLog, '風速', 20);
-          return cols.map(function(p, i){ return { text: windMap[i] || '', crack: isCrackCol(p.t) }; });
+      // 「回溫點」那一欄單純是溫度事件紀錄，不標記風門／火力；「00:00」參考欄也不參與配對
+      { label: (roast.machineName === 'Mini500') ? '風門' : '風速', cells: (function(){
+          var windLabel = (roast.machineName === 'Mini500') ? '風門' : '風速';
+          var windMap = buildEventColumnMap(cols, roast.triggeredLog, windLabel, 20, resetAt);
+          return cols.map(function(p, i){
+            if (p.synthetic) return { text: '', crack: false };
+            return { text: windMap[i] || '', crack: crackFlag(p) };
+          });
         })() },
       { label: '火力', cells: (function(){
-          var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20);
-          return cols.map(function(p, i){ return { text: powerMap[i] || '', crack: isCrackCol(p.t) }; });
+          var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20, resetAt);
+          return cols.map(function(p, i){
+            // 「00:00」參考欄純粹帶入即將生效的火力值，用一般樣式即可，不用加粗或特別標色
+            if (p.synthetic) return { text: p.power || '', crack: false };
+            return { text: powerMap[i] || '', crack: crackFlag(p) };
+          });
         })() }
     ];
     return rowDefs;
@@ -1681,12 +2126,12 @@ document.addEventListener('DOMContentLoaded', function(){
     };
 
     var summary = computeSummary();
-    var cols = roast.tempLog.slice().sort(function(a, b){ return a.t - b.t; });
+    var cols = buildLogCols();
     var labelColW = 58, colW = 52;
     var tableW = labelColW + Math.max(cols.length, 1) * colW;
     var w = Math.max(900, tableW + 48);
     var headerH = 144;
-    var stepBandH = hasFanPowerEvents(roast.triggeredLog) ? 130 : 0;
+    var stepBandH = (roast.machineName !== 'Mini500' && hasFanPowerEvents(roast.triggeredLog)) ? 130 : 0;
     var chartH = 340 + stepBandH + (stepBandH > 0 ? 22 : 0);
     var beanTitleH = 34;
     var beanTableH = 2 * 46;
@@ -1747,7 +2192,7 @@ document.addEventListener('DOMContentLoaded', function(){
       { text: '(細粉差 ' + (diffFineVal != null ? diffFineVal : '—') + ')', color: palette.diff }
     ], 24, 106);
 
-    renderChart(ctx, 24, headerH, w - 48, chartH - 20, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, theme);
+    renderChart(ctx, 24, headerH, w - 48, chartH - 20, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, theme, roast.machineName);
 
     var beanY = headerH + chartH + beanTitleH;
     ctx.fillStyle = palette.sectionTitle;

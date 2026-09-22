@@ -2,8 +2,19 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>杯測評分表｜第五波 精品咖啡 80以上+++</title>
+
+<!-- PWA：加入主畫面後可全螢幕、離線使用 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#241712">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="杯測評分">
+<link rel="icon" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -167,5 +178,15 @@
 
 <script src="vendor.js"></script>
 <script src="script.js"></script>
+<script>
+  // 註冊 Service Worker：加入主畫面後可全螢幕、離線使用
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{
+        // 註冊失敗（例如非 https 或瀏覽器不支援）不影響一般線上使用
+      });
+    });
+  }
+</script>
 </body>
 </html>

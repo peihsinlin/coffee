@@ -1,6 +1,6 @@
 {
-  "name": "杯測評分表",
-  "short_name": "杯測評分",
+  "name": "杯測小助手",
+  "short_name": "杯測小助手",
   "description": "C.C.D. 杯測表手機版 · 課堂杯測計時與評分工具",
   "start_url": "./index.html",
   "scope": "./",

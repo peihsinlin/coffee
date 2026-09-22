@@ -2,7 +2,7 @@
 // 目的：快取 app shell，讓「加入主畫面」後可離線開啟與評分。
 // 每次更動任何被快取的檔案時，請把 CACHE_VERSION 往上加一，
 // 否則使用者裝置上的舊快取不會更新。
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `cupping-score-${CACHE_VERSION}`;
 
 // 使用相對路徑，這樣不論部署在網站根目錄或子目錄都能正確快取。

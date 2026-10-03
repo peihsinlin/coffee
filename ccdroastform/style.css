@@ -160,7 +160,7 @@ label > *:not(:first-child){ margin-top:6px; }
 .plan-custom-lists{ display:grid; grid-template-columns:1fr 1fr; gap:0 10px; margin:16px 0 4px; }
 .list-col-title{ font-size:12px; font-weight:700; color:var(--ink-soft); margin:0 0 6px; }
 
-/* Mini500 專用：風門提醒的時間文字比 SR540/800 長（帶了「乾燥終點後」等事件錨點文字），
+/* Mini500 專用：風門提醒的時間文字比 SR540/800 長（帶了「澎到最大後」等事件錨點文字），
    先前改成「火力2欄、風門3欄」平分寬度，在較窄或中文字型渲染較寬的機型（如部分 Android 手機）
    上仍然不夠、還是會斷行；改成火力／風門提醒上下各佔一整列，讓風門提醒欄位能用到完整寬度，
    並把整列改成不換行（flex-wrap:nowrap），寬度不足時交由字級微調而不是靠斷行或換欄硬擠 */
@@ -189,7 +189,7 @@ label > *:not(:first-child){ margin-top:6px; }
 .crack-btn:disabled{ background:transparent; border-color:rgba(233,217,190,.18); color:rgba(233,217,190,.3); cursor:not-allowed; }
 /* .btn 的 display:inline-flex 跟瀏覽器對 [hidden] 屬性預設的 display:none 特異度相同，
    後面載入的 .btn 規則會蓋掉 [hidden]，導致 JS 設定的 btn.hidden=true 沒有真的隱藏按鈕（例如非 Mini500
-   機型時「回溫點／乾燥終點／第一聲」仍會顯示），這裡加大特異度把 [hidden] 的隱藏效果搶回來 */
+   機型時「回溫點／澎到最大／第一聲」仍會顯示），這裡加大特異度把 [hidden] 的隱藏效果搶回來 */
 .crack-btn[hidden]{ display:none; }
 
 .capture-panel{ background:var(--parchment); border:1px dashed var(--copper); border-radius:var(--radius); padding:16px; box-shadow:0 18px 40px rgba(0,0,0,.35); }

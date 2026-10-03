@@ -216,7 +216,7 @@ function clearRoastPlan(){
 // 依烘前重量帶入建議值：入豆溫度／轉速／初始風門直接填入欄位，回溫點火力、2:00 火力、8:00 火力
 // 則以「自動帶入」的提醒項目加進火力清單（會先移除先前自動帶入的項目再重新加入，
 // 使用者自己手動新增的提醒不受影響）；初始火力欄位維持使用者自行輸入的值（預設 0.1），不會被覆蓋。
-// 風門提醒固定自動帶入「乾燥終點後 00:00 全開」「乾燥終點後 00:50 左2」「乾燥終點後 01:00 右2」
+// 風門提醒固定自動帶入「澎到最大後 00:00 全開」「澎到最大後 00:50 左2」「澎到最大後 01:00 右2」
 // 「一爆起後 00:50 全開」這四筆預設值，不論烘前重量多少都一樣（沒有對照表可查，是固定的操作建議）
 function applyRoastPlan(){
   var machine = document.getElementById('machineSelect').value;
@@ -237,9 +237,9 @@ function applyRoastPlan(){
   state.miniFireEvents.push({ id: uid(), seconds: 480, value: (plan.power800 / 10).toFixed(1), auto: true });
 
   state.miniDamperEvents = state.miniDamperEvents.filter(function(ev){ return !ev.auto; });
-  state.miniDamperEvents.push({ id: uid(), anchor: '乾燥終點', seconds: 0, value: '全開', auto: true });
-  state.miniDamperEvents.push({ id: uid(), anchor: '乾燥終點', seconds: 50, value: '左2', auto: true });
-  state.miniDamperEvents.push({ id: uid(), anchor: '乾燥終點', seconds: 60, value: '右2', auto: true });
+  state.miniDamperEvents.push({ id: uid(), anchor: '澎到最大', seconds: 0, value: '全開', auto: true });
+  state.miniDamperEvents.push({ id: uid(), anchor: '澎到最大', seconds: 50, value: '左2', auto: true });
+  state.miniDamperEvents.push({ id: uid(), anchor: '澎到最大', seconds: 60, value: '右2', auto: true });
   state.miniDamperEvents.push({ id: uid(), anchor: '一爆起', seconds: 50, value: '全開', auto: true });
 
   renderMiniPlanEventList();
@@ -602,14 +602,14 @@ function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackE
   function xScale(t){ return x0 + padL + (t / maxT) * plotW; }
   function yScale(temp){ return y0 + padT + (1 - (temp - minTemp) / (maxTemp - minTemp)) * plotH; }
 
-  // 烘焙階段背景色：SR540／SR800 維持原本固定 155°C 分期；Mini500 改用「乾燥終點」事件的實際溫度來分期
-  // （乾燥終點以下為脫水期淡綠、乾燥終點至一爆起為梅納期淺黃、一爆起以上為發展期淺紅）
+  // 烘焙階段背景色：SR540／SR800 維持原本固定 155°C 分期；Mini500 改用「澎到最大」事件的實際溫度來分期
+  // （澎到最大以下為脫水期淡綠、澎到最大至一爆起為梅納期淺黃、一爆起以上為發展期淺紅）
   // 尚未記錄對應事件時，後面的分期先不畫，整段當作前一期
   var firstCrack = findEventByKeyword(crackEvents || [], '一爆');
   var developmentStart = firstCrack ? firstCrack.temp : null;
   var dryEnd;
   if (isMini){
-    var dryEndEvent = findEventByKeyword(crackEvents || [], '乾燥終點');
+    var dryEndEvent = findEventByKeyword(crackEvents || [], '澎到最大');
     dryEnd = dryEndEvent ? dryEndEvent.temp : null;
   } else {
     dryEnd = 155;
@@ -895,7 +895,7 @@ function resolvePendingConfirm(idx, write){
   renderConfirmPanel();
 }
 // ---------- Mini500 專用：風門提醒的「事件錨點」排程 ----------
-// 風門自訂提醒若選了事件（回溫點／乾燥終點／第一聲／一爆起／一爆止／二爆起／二爆止），
+// 風門自訂提醒若選了事件（回溫點／澎到最大／第一聲／一爆起／一爆止／二爆起／二爆止），
 // 不會有固定的絕對觸發時間，要等該事件真的被記錄下來時，才依「事件發生時間＋設定的分:秒」動態排入 roast.events，
 // 用跟固定時間提醒完全相同的「嗶聲＋語音＋確認寫入」流程處理
 function scheduleAnchoredDamperEvents(anchorLabel, anchorT){
@@ -1598,7 +1598,7 @@ document.addEventListener('DOMContentLoaded', function(){
     // 分開自訂的火力／風門清單（含依烘前重量自動帶入的回溫點火力、2:00 火力、8:00 火力）；
     // 這些提醒屬於「回溫點之後」才生效的時間軸，開始烘豆當下先不排入 roast.events，
     // 只記錄成範本（miniScheduleTemplate），等按下「回溫點」時才依新的 0:00 正式排入（見 tempPromptForm 的回溫點分支）。
-    // 風門提醒若有錨定事件（回溫點／乾燥終點／…），一樣要等事件真的發生時才動態排程
+    // 風門提醒若有錨定事件（回溫點／澎到最大／…），一樣要等事件真的發生時才動態排程
     var miniScheduleTemplate = [];
     var events;
     if (machineName === 'Mini500'){
@@ -1675,7 +1675,7 @@ document.addEventListener('DOMContentLoaded', function(){
     document.getElementById('rorReadout').textContent = 'RoR（升溫速率）－';
     document.getElementById('devReadout').hidden = true;
     document.querySelectorAll('.crack-btn').forEach(function(btn){ btn.disabled = false; });
-    // Mini500 才顯示「回溫點／乾燥終點／第一聲」，並把「調整風速」按鈕換成「調整風門」
+    // Mini500 才顯示「回溫點／澎到最大／第一聲」，並把「調整風速」按鈕換成「調整風門」
     document.querySelectorAll('.crack-btn--mini').forEach(function(btn){ btn.hidden = (machineName !== 'Mini500'); });
     document.getElementById('btnChangeFan').textContent = (machineName === 'Mini500') ? '調整風門' : '調整風速';
     document.getElementById('weightAfter').value = '';
@@ -1806,7 +1806,7 @@ document.addEventListener('DOMContentLoaded', function(){
       var usedBtn = document.querySelector('.crack-btn[data-label="' + crackLabel + '"]');
       if (usedBtn) usedBtn.disabled = true;
       roast.pendingCrackLabel = null;
-      // Mini500：乾燥終點／第一聲／一爆起／一爆止／二爆起／二爆止 也可能是風門提醒的錨定事件
+      // Mini500：澎到最大／第一聲／一爆起／一爆止／二爆起／二爆止 也可能是風門提醒的錨定事件
       if (roast.machineName === 'Mini500') scheduleAnchoredDamperEvents(crackLabel, elapsed);
     }
     hideTempPrompt();

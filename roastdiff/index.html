@@ -1058,5 +1058,11 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
 })();
 </script>
 
+<script>
+/* register the service worker so Android can install this page as an app */
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
 </body>
 </html>

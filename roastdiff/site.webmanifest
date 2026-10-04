@@ -1,0 +1,20 @@
+{
+  "name": "焙比 RoastDiff",
+  "short_name": "焙比",
+  "description": "讀取 Nucleus Link 與 Kaffelogic 烘焙報告 PDF，整理表格並對比曲線",
+  "lang": "zh-Hant",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#efe6d8",
+  "theme_color": "#efe6d8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "開啟焙比", "short_name": "焙比", "url": "./", "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] }
+  ]
+}

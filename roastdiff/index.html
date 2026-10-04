@@ -1,0 +1,1053 @@
+<!doctype html>
+<!-- 焙比 RoastDiff | Copyright (c) 2026 PEI-HSIN LIN | MIT License (see LICENSE.txt) -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>焙比 RoastDiff</title>
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}*,*::before,*::after{box-sizing:border-box}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<!--
+  焙比 RoastDiff
+  Copyright (c) 2026 PEI-HSIN LIN
+  Released under the MIT License. See LICENSE.txt for the full text.
+
+  Third-party: PDF.js (Mozilla, Apache License 2.0) is loaded from cdnjs;
+  Noto Sans TC and JetBrains Mono (SIL Open Font License 1.1) from Google Fonts.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one working column — drop zone, column picker, editable table, rendered PNG preview */
+:root {
+  --bg: #f3f1ef; --panel: #ffffff; --fg: #2a2320; --muted: #76685f; --line: #ddd5ce;
+  --accent: #8a3b24; --accent-fg: #ffffff; --accent-soft: #f2e2dc; --chip: #ece6e1;
+  --font-ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1b1715; --panel: #26201d; --fg: #eee6e0; --muted: #a8998f; --line: #3d3430;
+  --accent: #e0805f; --accent-fg: #1b1715; --accent-soft: #3a2a24; --chip: #322a26; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1b1715; --panel: #26201d; --fg: #eee6e0; --muted: #a8998f; --line: #3d3430;
+  --accent: #e0805f; --accent-fg: #1b1715; --accent-soft: #3a2a24; --chip: #322a26; color-scheme: dark }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1100px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+.wrap > * { min-width: 0; }
+header h1 { font-size: 1.6rem; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+header p { margin: 4px 0 0; color: var(--muted); }
+.drop { border: 2px dashed var(--line); border-radius: 14px; background: var(--panel); padding: 26px 18px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop:focus-visible, button:focus-visible, label.chip:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
+.drop strong { font-size: 1.05rem; }
+.drop small { display: block; color: var(--muted); margin-top: 4px; }
+.status { color: var(--muted); font-size: .9rem; min-height: 1.4em; }
+.status.err { color: var(--accent); }
+section h2 { font-size: .8rem; letter-spacing: .12em; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+label.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--chip); cursor: pointer; user-select: none; font-size: .92rem; }
+label.chip input { accent-color: var(--accent); margin: 0; }
+.row-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px; }
+.capbox { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; flex: 1 1 auto; }
+.capbox .btn { padding: 6px 14px; }
+.row-head input[type=date] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
+.row-head input[type=text] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); width: min(100%, 300px); }
+.tablebox { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+th, td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; white-space: pre; }
+th { font-size: .8rem; color: var(--muted); font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+td { font-family: var(--font-num), var(--font-ui); font-variant-numeric: tabular-nums; font-size: .86rem; min-width: 70px; }
+td[contenteditable]:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+td.manual { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+td.manual .ed:empty::before, td.manual.ed:empty::before { content: attr(data-ph); color: var(--muted); opacity: .6; }
+td.manual .ed:focus { outline: none; }
+td .diff { color: var(--accent); font-weight: 600; font-size: .8rem; margin-top: 2px; }
+.stepper { white-space: nowrap; }
+td.stepper button { font: inherit; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); cursor: pointer; vertical-align: middle; }
+td.stepper button:hover { border-color: var(--accent); color: var(--accent); }
+td.stepper input { font: inherit; width: 76px; margin: 0 4px; padding: 3px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); text-align: center; vertical-align: middle; }
+td.sel select { font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); }
+td.act { min-width: 0; width: 1%; }
+td.act button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 0 4px; }
+td.act button:hover { color: var(--accent); }
+td.act button:disabled { opacity: .25; cursor: default; }
+td.act { white-space: nowrap; }
+tr.sample td { color: var(--muted); }
+.tag { display: inline-block; font-family: var(--font-ui); font-size: .72rem; background: var(--chip); color: var(--muted); padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.hint { color: var(--muted); font-size: .85rem; margin: 6px 0 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+button.btn { font: inherit; font-weight: 500; border-radius: 10px; padding: 9px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+button.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.btn:disabled { opacity: .5; cursor: default; }
+.preview { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow-x: auto; }
+.site-foot { color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); padding-top: 14px; }
+.preview .empty { margin: 8px 4px; color: var(--muted); }
+.preview img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 6px; }
+:root { --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; } }
+:root[data-theme="dark"] { --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; }
+.cmp-box { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.cmp-box canvas { display: block; width: 100%; touch-action: pan-y; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 2px 4px 8px; font-size: .88rem; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { font: inherit; font-size: .9rem; border: 0; background: var(--panel); color: var(--fg); padding: 6px 14px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: .8rem; box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tip b { font-family: var(--font-num); }
+.tip .tt { color: var(--muted); margin-bottom: 4px; font-family: var(--font-num); }
+.tip .r { display: flex; align-items: center; gap: 6px; }
+.tip .r i { width: 10px; height: 3px; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>焙比 RoastDiff</h1>
+    <p>拖入 Nucleus Link 或 Kaffelogic Nano 7（Studio 軟體）匯出的烘焙報告 PDF（可一次多份，兩種機型可混用），自動讀出曲線、風扇、爆點、DTR、入豆溫度與曲線下面積（AUC），產生可下載的表格圖片。所有解析都在你的瀏覽器內完成。</p>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇 PDF 檔案">
+    <strong>拖曳 PDF 到這裡，或點一下選擇檔案</strong>
+    <small>支援 Link Studio 與 Kaffelogic Studio 的報告格式，繁體中文、簡體中文或英文介面皆可</small>
+    <input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+  </div>
+  <div class="status" id="status" aria-live="polite">正在載入 PDF 解析器…</div>
+
+  <section>
+    <h2>表格欄位</h2>
+    <div class="chips" id="cols"></div>
+  </section>
+
+  <section>
+    <div class="row-head">
+      <h2 style="margin:0">表格內容</h2>
+      <div class="capbox"><input type="date" id="capdate" aria-label="日期"><input type="text" id="caption" placeholder="標題 (選填)，例如：衣索比亞 瑰夏村"><button class="btn" id="clear" type="button">清空表格</button></div>
+    </div>
+    <div class="tablebox" style="margin-top:8px"><table id="tbl"></table></div>
+    <p class="hint">淡色底的欄位是手動輸入：風門策略用下拉選單選 A–D；風量設定用 − / + 每次調 0.005（也可以直接輸入，會自動對齊到 0.005 的倍數）；建議DTR 填範圍（例如 10-12，會顯示 10-12%）；第一聲、實際一爆填「時間 溫度」（例如 6:40 203，會分成兩行顯示；報告有記錄一爆時會自動帶入實際一爆）；烘後重與各焙度填數字（自動取到小數一位）。粉差＝粗粉焙度 − 豆焙度，細粉差＝細粉焙度 − 豆焙度，填了豆焙度才會算。手動填的值會記在這台瀏覽器，下次載入同一個檔案會自動帶入。每列右側的 ↑ ↓ 可以調整順序。</p>
+  </section>
+
+  <section>
+    <div class="row-head" style="margin-bottom:8px">
+      <h2 style="margin:0">圖片預覽</h2>
+      <div class="actions">
+        <button class="btn" id="save">下載表格</button>
+        <button class="btn" id="combo-save">表格及曲線合併下載</button>
+      </div>
+    </div>
+    <div class="preview"><img id="out" alt="烘焙紀錄表格圖片"><p class="empty" id="out-empty" hidden>表格是空的。把 PDF 拖到上方，這裡就會出現表格圖片。</p></div>
+    <p class="hint" id="savehint"></p>
+  </section>
+  <section>
+    <div class="row-head" style="margin-bottom:8px">
+      <h2 style="margin:0">曲線比較</h2>
+      <div class="actions">
+        <button class="btn" id="cmp-save">下載曲線</button>
+        <button class="btn" id="combo-save2">表格及曲線合併下載</button>
+      </div>
+    </div>
+    <div class="cmp-box" id="cmp-box">
+      <div class="legend" id="legend"></div>
+      <canvas id="cmp" height="560" aria-label="豆溫、ROR、風扇轉速曲線比較圖"></canvas>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <p class="hint">由上而下：豆溫、ROR、風扇轉速，三張共用同一條時間軸。空心圓＝一爆（虛線圓為預期值），實心圓＝下豆。風扇轉速以報告中深藍色的曲線為準；報告裡較淺的藍線（套用風扇調節後）用同色較淺的線畫出。曲線若完全重疊會互相遮住，滑過圖表可在提示框看到每一份的數值。滑過圖表可看各時間點數值。</p>
+  </section>
+
+  <footer class="site-foot">© 2026 PEI-HSIN LIN · 以 MIT 授權釋出（MIT License）· PDF 解析使用 PDF.js（Apache License 2.0）</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+/*! 焙比 RoastDiff | Copyright (c) 2026 PEI-HSIN LIN | MIT License */
+// ===== Nucleus Link PDF core (shared by page and node tests) =====
+var NLCore = (function () {
+  var TW = 10, TH = 14;
+
+  function isDark(d, i) { return Math.min(d[i], d[i + 1], d[i + 2]) < 150; }
+  function darkness(d, i) { return 255 - (d[i] + d[i + 1] + d[i + 2]) / 3; }
+
+  // ---------- grid detection ----------
+  function findGrid(img) {
+    var w = img.width, h = img.height, d = img.data;
+    function gray(i) {
+      var r = d[i], g = d[i + 1], b = d[i + 2];
+      return Math.abs(r - g) < 6 && Math.abs(g - b) < 6 && r > 170 && r < 245;
+    }
+    var rows = [], cols = [];
+    for (var y = 0; y < h; y++) { var c = 0; for (var x = 0; x < w; x++) if (gray((y * w + x) * 4)) c++; if (c > w * 0.4) rows.push(y); }
+    for (var x2 = 0; x2 < w; x2++) { var c2 = 0; for (var y2 = 0; y2 < h; y2++) if (gray((y2 * w + x2) * 4)) c2++; if (c2 > h * 0.4) cols.push(x2); }
+    function merge(a) { var out = []; a.forEach(function (v) { if (out.length && v - out[out.length - 1].e <= 2) out[out.length - 1].e = v; else out.push({ s: v, e: v }); }); return out.map(function (o) { return (o.s + o.e) / 2; }); }
+    return { rows: merge(rows), cols: merge(cols) };
+  }
+
+  // ---------- glyph segmentation ----------
+  function segment(img, x0, y0, x1, y1) {
+    var w = img.width, d = img.data, glyphs = [], inRun = false, start = 0;
+    function colDark(x) { for (var y = y0; y <= y1; y++) if (isDark(d, (y * w + x) * 4)) return true; return false; }
+    for (var x = x0; x <= x1 + 1; x++) {
+      var dk = x <= x1 && colDark(x);
+      if (dk && !inRun) { inRun = true; start = x; }
+      else if (!dk && inRun) { inRun = false; glyphs.push({ x0: start, x1: x - 1 }); }
+    }
+    glyphs.forEach(function (g) {
+      var top = y1, bot = y0;
+      for (var y = y0; y <= y1; y++) for (var x = g.x0; x <= g.x1; x++) if (isDark(d, (y * w + x) * 4)) { if (y < top) top = y; if (y > bot) bot = y; }
+      g.y0 = top; g.y1 = bot;
+    });
+    return glyphs;
+  }
+  function vec(img, g) {
+    var w = img.width, d = img.data, gw = g.x1 - g.x0 + 1, gh = g.y1 - g.y0 + 1, v = [];
+    for (var ty = 0; ty < TH; ty++) for (var tx = 0; tx < TW; tx++) {
+      var sx0 = g.x0 + tx * gw / TW, sx1 = g.x0 + (tx + 1) * gw / TW, sy0 = g.y0 + ty * gh / TH, sy1 = g.y0 + (ty + 1) * gh / TH, s = 0, n = 0;
+      for (var y = Math.floor(sy0); y < Math.ceil(sy1); y++) for (var x = Math.floor(sx0); x < Math.ceil(sx1); x++) { s += darkness(d, (y * w + x) * 4); n++; }
+      v.push(Math.round(n ? s / n : 0));
+    }
+    return { v: v, w: gw, h: gh };
+  }
+  // group glyphs into words by gap
+  function words(glyphs, gap) {
+    var out = [];
+    glyphs.forEach(function (g) { var last = out[out.length - 1]; if (last && g.x0 - last[last.length - 1].x1 > gap) out.push([g]); else if (last) last.push(g); else out.push([g]); });
+    return out;
+  }
+  function band(img, x0, x1, yStart, dir, maxSpan) {
+    // find first band of rows with dark pixels starting at yStart moving dir
+    var w = img.width, d = img.data, y = yStart, lim = yStart + dir * maxSpan, a = -1, b = -1;
+    function rowDark(yy) { for (var x = x0; x <= x1; x++) if (isDark(d, (yy * w + x) * 4)) return true; return false; }
+    for (; dir > 0 ? y < lim : y > lim; y += dir) { if (y < 0 || y >= img.height) break; var rd = rowDark(y); if (rd && a < 0) a = y; if (!rd && a >= 0) { b = y - dir; break; } }
+    if (a < 0) return null; if (b < 0) b = y - dir;
+    return dir > 0 ? [a, b] : [b, a];
+  }
+
+  // x-axis labels: one word per label, below plot bottom
+  function xLabelWords(img, grid) {
+    var bottom = Math.round(grid.rows[grid.rows.length - 1]);
+    var bd = band(img, 0, img.width - 1, bottom + 3, 1, 60);
+    if (!bd) return [];
+    var gl = segment(img, 0, bd[0], img.width - 1, bd[1]);
+    return words(gl, 8).map(function (wd) { return { glyphs: wd, cx: (wd[0].x0 + wd[wd.length - 1].x1) / 2, left: wd[0].x0, right: wd[wd.length - 1].x1 }; });
+  }
+  function yLabelWords(img, grid) {
+    var left = Math.round(grid.cols[0]);
+    return grid.rows.map(function (ry) {
+      var y0 = Math.max(0, Math.round(ry) - 12), y1 = Math.min(img.height - 1, Math.round(ry) + 12);
+      var gl = segment(img, 0, y0, left - 4, y1);
+      var ws = words(gl, 6);
+      return { glyphs: ws.length ? ws[ws.length - 1] : [], cy: ry };
+    }).filter(function (o) { return o.glyphs.length; });
+  }
+
+  function classify(img, g, T) {
+    var q = vec(img, g), best = null, bs = 1e18;
+    for (var ch in T) T[ch].forEach(function (t) {
+      var s = 0; for (var i = 0; i < q.v.length; i++) { var e = q.v[i] - t.v[i]; s += e * e; }
+      s += Math.pow((q.w / q.h - t.w / t.h) * 2000, 2) + Math.pow((q.h - t.h) * 300, 2);
+      if (s < bs) { bs = s; best = ch; }
+    });
+    return best;
+  }
+  function readWord(img, glyphs, T) { return glyphs.map(function (g) { return classify(img, g, T); }).join(''); }
+
+  function fitLine(pairs) { // pairs [px, val]
+    var n = pairs.length; if (n < 2) return null;
+    var sx = 0, sy = 0, sxx = 0, sxy = 0; pairs.forEach(function (p) { sx += p[0]; sy += p[1]; sxx += p[0] * p[0]; sxy += p[0] * p[1]; });
+    var a = (n * sxy - sx * sy) / (n * sxx - sx * sx), b = (sy - a * sx) / n;
+    return { a: a, b: b, toVal: function (px) { return a * px + b; }, toPx: function (v) { return (v - b) / a; } };
+  }
+  function mmss(s) { var m = s.match(/^(\d+):(\d\d)$/); return m ? (+m[1]) * 60 + (+m[2]) : null; }
+  function fmt(sec) { sec = Math.round(sec); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+
+  // ---------- fan chart analysis ----------
+  function analyzeFan(img, T, times) {
+    var grid = findGrid(img);
+    if (grid.rows.length < 3 || grid.cols.length < 3) return { error: '找不到風扇圖的格線' };
+    var xs = xLabelWords(img, grid).map(function (w) {
+      // tick labels sit beside their gridline (left-aligned), not centred: snap to the gridline nearest the label's span
+      var best = w.cx, bd = 1e9;
+      grid.cols.forEach(function (c) { var dd = c < w.left ? w.left - c : (c > w.right ? c - w.right : 0); dd = Math.min(dd, Math.abs(c - w.left)); if (dd < bd) { bd = dd; best = c; } });
+      return { px: bd < 20 ? best : w.cx, s: readWord(img, w.glyphs, T), off: w.left - best };
+    });
+    var xp = []; xs.forEach(function (o) { var t = mmss(o.s); if (t != null) xp.push([o.px, t]); });
+    var ys = yLabelWords(img, grid).map(function (w) { return { py: w.cy, s: readWord(img, w.glyphs, T) }; });
+    var yp = []; ys.forEach(function (o) { if (/^\d+$/.test(o.s)) yp.push([o.py, +o.s]); });
+    var fx = robustFit(xp), fy = robustFit(yp);
+    if (!fx || !fy) return { error: '讀不到風扇圖的座標刻度', xs: xs, ys: ys };
+    var top = grid.rows[0], bottom = grid.rows[grid.rows.length - 1];
+    function readAt(sec) {
+      var x0 = Math.round(fx.toPx(sec)), w = img.width, d = img.data;
+      for (var off = 0; off < 18; off++) { // markers can sit on the line: look up to ±9 px (~4 s) aside
+        var x = x0 + (off % 2 ? -1 : 1) * Math.ceil(off / 2), runs = [], cur = null;
+        if (x < 0 || x >= w) continue;
+        for (var y = Math.floor(top); y <= Math.ceil(bottom); y++) {
+          var i = (y * w + x) * 4, r = d[i], b = d[i + 2], wt = b - r;
+          if (wt > 40) { if (!cur) { cur = { minR: 255, sw: 0, sy: 0 }; runs.push(cur); } cur.minR = Math.min(cur.minR, r); cur.sw += wt; cur.sy += wt * y; }
+          else cur = null;
+        }
+        if (!runs.length) continue;
+        var dark = null, light = null;
+        runs.forEach(function (rn) { var v = Math.round(fy.toVal(rn.sy / rn.sw)); if (rn.minR < 60) { if (dark == null) dark = v; } else if (light == null) light = v; });
+        if (dark == null && light == null) continue;
+        return { base: dark, adj: light };
+      }
+      return { base: null, adj: null };
+    }
+    var out = { fit: { x: fx, y: fy }, xs: xs, ys: ys, read: readAt, yMax: fy.toVal(top) };
+    // per-column read of both lines: dark = the profile fan curve, light = the curve with fan steps applied
+    function colRuns(x) {
+      var w = img.width, d = img.data, runs = [], cur = null, dark = null, light = null;
+      if (x < 0 || x >= w) return { dark: null, light: null };
+      for (var y = Math.floor(top); y <= Math.ceil(bottom); y++) {
+        var i = (y * w + x) * 4, r = d[i], b = d[i + 2], wt = b - r;
+        if (wt > 40) { if (!cur) { cur = { minR: 255, sw: 0, sy: 0 }; runs.push(cur); } cur.minR = Math.min(cur.minR, r); cur.sw += wt; cur.sy += wt * y; } else cur = null;
+      }
+      runs.forEach(function (rn) { var v = Math.round(fy.toVal(rn.sy / rn.sw)); if (rn.minR < 60) { if (dark == null) dark = v; } else if (light == null) light = v; });
+      return { dark: dark, light: light };
+    }
+    out.seriesBoth = function (t1) {
+      var base = [], adj = [];
+      for (var t = 0; t <= t1; t += 1) {
+        var x0 = Math.round(fx.toPx(t)), b = null, l = null;
+        for (var off = 0; off < 18 && b == null; off++) { var c = colRuns(x0 + (off % 2 ? -1 : 1) * Math.ceil(off / 2)); if (c.dark != null) b = c.dark; }
+        for (var o2 = -1; o2 <= 1 && l == null; o2++) { var c2 = colRuns(x0 + o2); if (c2.light != null) l = c2.light; }
+        if (b != null) base.push({ t: t, v: b });
+        // a light pixel run that sits on the dark line is only its anti-aliased edge (or a marker), not the adjusted curve
+        if (l != null && (b == null || Math.abs(l - b) >= 3)) adj.push({ t: t, v: l });
+      }
+      // keep only runs of the adjusted curve that last at least 4 s; shorter specks are markers or edges
+      var segs = [], cur = null;
+      adj.forEach(function (q, k) { if (!cur || q.t - adj[k - 1].t > 3) { cur = []; segs.push(cur); } cur.push(q); });
+      segs.forEach(function (sg) { // the column on a vertical step reads mid-step: drop it, the step is drawn from the dark line
+        // a step can be anti-aliased over two columns, so compare with the point two seconds on
+        while (sg.length > 3 && Math.abs(sg[0].v - sg[2].v) > 3) sg.shift();
+        while (sg.length > 3 && Math.abs(sg[sg.length - 1].v - sg[sg.length - 3].v) > 3) sg.pop();
+      });
+      adj = [].concat.apply([], segs.filter(function (sg) { return sg[sg.length - 1].t - sg[0].t >= 4; }));
+      return { base: base, adj: adj };
+    };
+    out.series = function (t1) { var a = []; for (var t = 0; t <= t1; t += 2) { var r = readAt(t), v = r.adj != null ? r.adj : r.base; if (v != null) a.push({ t: t, v: v }); } return a; };
+    return out;
+  }
+  function robustFit(p) {
+    // drop OCR misreads: keep points consistent with the median slope
+    if (p.length < 2) return null;
+    var f = fitLine(p); if (!f) return null;
+    var res = p.map(function (q) { return Math.abs(f.toVal(q[0]) - q[1]); });
+    var sorted = res.slice().sort(function (a, b) { return a - b; }), tol = Math.max(sorted[sorted.length >> 1] * 3, 1e-6);
+    var keep = p.filter(function (q, i) { return res[i] <= tol; });
+    return keep.length >= 2 ? fitLine(keep) : f;
+  }
+
+
+  // ---------- roast (bean temperature) curve: charge temp + AUC ----------
+  function analyzeRoast(img, T, dropSec) {
+    var f = analyzeFan(img, T);
+    if (f.error) return null;
+    var g = findGrid(img), top = Math.round(g.rows[0]), bot = Math.round(g.rows[g.rows.length - 1]);
+    var yMax = f.fit.y.toVal(top); if (yMax > 400) return null; // that's the fan chart
+    var fx = f.fit.x, fy = f.fit.y, w = img.width, d = img.data;
+    // Line colours in Link / Kaffelogic Studio charts:
+    //   actual bean temp = pure red, drawn UNDER the blue profile curve
+    //   actual ROR = dark red (204,50,50), drawn UNDER the bright-green profile ROR
+    // When the actual line runs on top of the profile line it is hidden, so the profile line
+    // (or the blended pixels where they overlap) stands in for it.
+    function isTemp(r, gg, b) { return r >= 245 && gg < 170 && Math.abs(gg - b) < 12; }
+    function tempOcc(r, gg, b) { return (b >= 200 && r < 140 && gg < 140) || (r >= 140 && gg < 70 && b >= 50 && b < 200); }
+    function isRor(r, gg, b) { return r >= 190 && r <= 222 && gg >= 28 && gg <= 80 && Math.abs(gg - b) < 15; }
+    function rorOcc(r, gg, b) { return gg >= 225 && r < 70 && b < 70; }
+    var xL = Math.round(g.cols[0]), xR = Math.round(g.cols[g.cols.length - 1]) - 1;
+    function trace(pred, occ, seedSec, x0s, x1s, pickTop) {
+      function runs(x, pr) { var out = [], cur = null; for (var y = top; y <= bot; y++) { var i = (y * w + x) * 4; if (pr(d[i], d[i + 1], d[i + 2])) { if (!cur) { cur = { a: y, b: y }; out.push(cur); } cur.b = y; } else cur = null; } return out.map(function (r) { return (r.a + r.b) / 2; }); }
+      var xEnd = Math.min(xR, Math.round(fx.toPx(x1s))), xStart = Math.max(xL, Math.round(fx.toPx(x0s)));
+      var seedX = Math.round(fx.toPx(seedSec)), rs = [];
+      for (var sx = seedX; sx < xEnd && !rs.length; sx++) { rs = runs(sx, pred); seedX = sx; }
+      if (!rs.length) return [];
+      var pts = {}; pts[seedX] = pickTop ? Math.min.apply(null, rs) : rs[0];
+      function nearest(r, p) { return r.reduce(function (a, b) { return Math.abs(b - p) < Math.abs(a - p) ? b : a; }); }
+      function walk(from, to, step) {
+        var p = pts[seedX], gap = 0;
+        for (var x = from; step > 0 ? x <= to : x >= to; x += step) {
+          gap++;
+          var r = runs(x, pred), n = r.length ? nearest(r, p) : null;
+          if ((n == null || Math.abs(n - p) > 25) && p < bot - 3) { var o = runs(x, occ); var m = o.length ? nearest(o, p) : null; n = (m != null && Math.abs(m - p) <= Math.min(6 + 2 * gap, 12)) ? m : null; }
+          else if (n != null && Math.abs(n - p) > 25) n = null;
+          if (n != null) { pts[x] = n; p = n; gap = 0; }
+        }
+      }
+      walk(seedX + 1, xEnd, 1); walk(seedX - 1, xStart, -1);
+      return Object.keys(pts).map(Number).sort(function (a, b) { return a - b; }).map(function (x) { return { t: fx.toVal(x), v: fy.toVal(pts[x]) }; });
+    }
+    var arr = trace(isTemp, tempOcc, 90, 0, dropSec ? dropSec : 1200, true);
+    if (arr.length < 20) return null;
+    // end of roast: the recorded drop time when the report has one; otherwise where the curve starts its steep fall
+    var mx = -1, endT = arr[arr.length - 1].t;
+    arr.forEach(function (q) { if (q.t <= endT && q.v > mx) mx = q.v; });
+    if (dropSec) endT = Math.min(dropSec, arr[arr.length - 1].t);
+    else { mx = -1; for (var i = 0; i < arr.length; i++) { var q = arr[i]; if (q.v > mx) mx = q.v; else if (mx - q.v > 8) { endT = q.t; break; } } }
+    var charge = arr[0].v, auc = 0;
+    for (var k = 1; k < arr.length; k++) { var a = arr[k - 1], b = arr[k]; if (b.t > endT) break; auc += (Math.max(a.v - charge, 0) + Math.max(b.v - charge, 0)) / 2 * (b.t - a.t); }
+    var temp = arr.filter(function (q) { return q.t <= endT; });
+    var ror = trace(isRor, rorOcc, 180, 0, endT, false).filter(function (q) { return q.t <= endT; });
+    return { charge: charge, auc: auc / 60, endT: endT, peak: mx, temp: thin(temp), ror: thin(ror) };
+  }
+
+  function thin(a) { var out = [], last = -9; a.forEach(function (q) { if (q.t - last >= 1) { out.push({ t: Math.round(q.t * 10) / 10, v: Math.round(q.v * 10) / 10 }); last = q.t; } }); return out; }
+
+  // ---------- text parsing ----------
+  function parseReport(pages) {
+    // pages: array of arrays of lines; each line = array of cell strings
+    var R = { records: {}, predicted: {}, settings: {} };
+    function parseBlocks(lines, target) {
+      for (var i = 0; i < lines.length; i++) {
+        var L = lines[i];
+        var nxt = lines[i + 1];
+        if (nxt && nxt[0] === 'Temperature' && L.length >= 1 && !/Temperature|Time|Duration/.test(L[0])) {
+          var heads = L, temps = valuesAfter(lines[i + 1], 'Temperature'), timesL = valuesAfter(lines[i + 2] || [], 'Time');
+          var phaseHeads = lines[i + 3] || [], dur = valuesAfter(lines[i + 4] || [], 'Duration'), pct = valuesAfter(lines[i + 5] || [], 'Percent'), inc = valuesAfter(lines[i + 6] || [], 'Increase');
+          heads.forEach(function (h, k) { target[h] = { temp: clean(temps[k]), time: clean(timesL[k]) }; });
+          phaseHeads.forEach(function (h, k) { target['phase:' + h] = { dur: clean(dur[k]), pct: clean(pct[k]), inc: clean(inc[k]) }; });
+          i += 6;
+        }
+      }
+    }
+    function valuesAfter(line, key) { var out = []; for (var k = 0; k < line.length; k++) if (line[k] === key) out.push(line[k + 1]); return out; }
+    function clean(v) { if (v == null) return null; v = String(v).trim(); return v === '-' || v === '' ? null : v; }
+    pages.forEach(function (lines, pi) {
+      var flat = lines.map(function (l) { return l.join(' '); }).join('\n');
+      if (/預期一爆|预期一爆|建議烘焙結束|建议烘焙结束|Expected first crack|Recommended roast end/i.test(flat)) parseBlocks(lines, R.predicted);
+      else if (/記錄|记录|Logged /i.test(flat) && /Temperature/.test(flat)) parseBlocks(lines, R.records);
+      if (pi === 0 && lines.length && !R.title) R.title = lines[0].join(' ').trim();
+      if (/Kaffelogic Studio/i.test(flat)) R.machine = 'Kaffelogic Nano 7'; else if (/Link Studio/i.test(flat)) R.machine = R.machine || 'Nucleus Link';
+      lines.forEach(function (l) {
+        var s = l.join(' ');
+        var m = s.match(/^\s*([A-Za-z][A-Za-z0-9 _\-]*?):\s*(.*)$/);
+        if (m) R.settings[m[1].trim().toLowerCase()] = m[2].trim();
+      });
+    });
+    return R;
+  }
+  return { analyzeRoast: analyzeRoast, findGrid: findGrid, segment: segment, vec: vec, words: words, band: band, xLabelWords: xLabelWords, yLabelWords: yLabelWords, analyzeFan: analyzeFan, parseReport: parseReport, mmss: mmss, fmt: fmt, TW: TW, TH: TH };
+})();
+
+
+// shared pdf extraction (browser + node). expects pdfjsLib.
+async function nlExtract(pdfjsLib, data) {
+  var doc = await pdfjsLib.getDocument({ data: data, isOffscreenCanvasSupported: false, useSystemFonts: true }).promise;
+  var pages = [], images = [];
+  for (var p = 1; p <= doc.numPages; p++) {
+    var page = await doc.getPage(p);
+    var tc = await page.getTextContent();
+    var items = tc.items.filter(function (it) { return it.str && it.str.trim(); }).map(function (it) { return { s: it.str.trim(), x: it.transform[4], y: it.transform[5] }; });
+    items.sort(function (a, b) { return b.y - a.y || a.x - b.x; });
+    var lines = [];
+    items.forEach(function (it) { var L = lines[lines.length - 1]; if (L && Math.abs(L.y - it.y) < 3) L.cells.push(it); else lines.push({ y: it.y, cells: [it] }); });
+    pages.push(lines.map(function (L) { L.cells.sort(function (a, b) { return a.x - b.x; }); return L.cells.map(function (c) { return c.s; }); }));
+    var ops = await page.getOperatorList(), imgs = [];
+    for (var i = 0; i < ops.fnArray.length; i++) {
+      if (ops.fnArray[i] === pdfjsLib.OPS.paintImageXObject) {
+        var id = ops.argsArray[i][0];
+        var obj = await new Promise(function (res) { (id.startsWith('g_') ? page.commonObjs : page.objs).get(id, res); });
+        imgs.push(toRGBA(obj));
+      }
+    }
+    images.push(imgs);
+  }
+  return { pages: pages, images: images };
+}
+function toRGBA(o) {
+  var w = o.width, h = o.height, src = o.data, out = new Uint8ClampedArray(w * h * 4);
+  if (o.bitmap) return { width: w, height: h, bitmap: o.bitmap };
+  if (src.length === w * h * 4) out.set(src);
+  else if (src.length === w * h * 3) { for (var i = 0, j = 0; i < w * h; i++) { out[j++] = src[i * 3]; out[j++] = src[i * 3 + 1]; out[j++] = src[i * 3 + 2]; out[j++] = 255; } }
+  else { for (var k = 0; k < w * h; k++) { var v = src[k]; out[k * 4] = out[k * 4 + 1] = out[k * 4 + 2] = v; out[k * 4 + 3] = 255; } }
+  // composite alpha over white
+  for (var q = 0; q < out.length; q += 4) { var a = out[q + 3] / 255; if (a < 1) { out[q] = out[q] * a + 255 * (1 - a); out[q + 1] = out[q + 1] * a + 255 * (1 - a); out[q + 2] = out[q + 2] * a + 255 * (1 - a); out[q + 3] = 255; } }
+  return { width: w, height: h, data: out };
+}
+
+
+// Turn extracted PDF data into one table row (browser + node)
+var NLRows = (function () {
+  var C = (typeof NLCore !== 'undefined') ? NLCore : require('./core.js');
+
+  var COLUMNS = [
+    { key: 'machine', label: '機型', on: true },
+    { key: 'file', label: '檔案', on: true },
+    { key: 'profile', label: '曲線編號', on: true },
+    { key: 'damper', label: '風門策略', on: true, manual: 'select', options: ['A', 'B', 'C', 'D'] },
+    { key: 'dtrTarget', label: '建議DTR', on: false, manual: 'pct' },
+    { key: 'dtr', label: 'DTR', on: true },
+    { key: 'fanOp', label: '風量設定', on: true, manual: 'step', step: 0.005 },
+    { key: 'fanCurve', label: '風扇調節', on: true },
+    { key: 'fanSpeed', label: '風速', on: false },
+    { key: 'charge', label: '入豆溫', on: false },
+    { key: 'firstSound', label: '第一聲', on: true, manual: 'event' },
+    { key: 'fcActual', label: '實際一爆', on: true, manual: 'event' },
+    { key: 'fcStart', label: '預期一爆', on: true },
+    { key: 'drop', label: '下豆', on: true },
+    { key: 'auc', label: 'AUC', on: true },
+    { key: 'weight', label: '烘後重(g)', on: true, manual: 'num' },
+    { key: 'agBean', label: '豆焙度', on: true, manual: 'num' },
+    { key: 'agCoarse', label: '粗粉焙度及粉差', on: false, manual: 'num', diff: '粉差' },
+    { key: 'agFine', label: '細粉焙度及粉差', on: true, manual: 'num', diff: '粉差' },
+    { key: 'designer', label: '曲線設計者', on: false }
+  ];
+
+  function temp(t) { if (!t) return ''; t = String(t).trim(); return /°C$/.test(t) ? t : t + '°C'; }
+  function tt(o) { if (!o || (!o.time && !o.temp)) return null; return [o.time, temp(o.temp)].filter(Boolean).join('\n'); }  // time on the first line, temperature on the second
+
+  function classify(key) {
+    var k = key.toLowerCase();
+    var sc = /二爆|second crack|2nd crack/.test(k), fc = /一爆|first crack|1st crack/.test(k);
+    var end = /止|結束|结束|end/.test(k);
+    if (sc) return end ? 'scEnd' : 'scStart';
+    if (fc) return end ? 'fcEnd' : 'fcStart';
+    if (/轉黃|转黄|yellow|colou?r change|dry/.test(k)) return 'yellow';
+    if (/烘焙結束|烘焙结束|下豆|roast end|end of roast|drop/.test(k)) return 'drop';
+    return null;
+  }
+
+  function build(fileName, ex, T) {
+    var R = C.parseReport(ex.pages), S = R.settings, rec = {}, pred = {}, notes = [];
+    Object.keys(R.records).forEach(function (k) { if (k.indexOf('phase:') === 0) return; var c = classify(k); if (c && !rec[c]) rec[c] = R.records[k]; });
+    Object.keys(R.predicted).forEach(function (k) { if (k.indexOf('phase:') === 0) return; var c = classify(k); if (c && !pred[c]) pred[c] = R.predicted[k]; });
+    var devRec = null; Object.keys(R.records).forEach(function (k) { if (/phase:(發展|发展|develop)/i.test(k)) devRec = R.records[k]; });
+
+    var row = { _fileName: fileName };
+    row.file = fileName.replace(/\.pdf$/i, '');
+    row.profile = S['profile short name'] || '';
+    row.designer = S['profile designer'] || '';
+    row.machine = R.machine || (/\.klog/i.test(R.title || '') ? 'Kaffelogic Nano 7' : /\.nlog/i.test(R.title || '') ? 'Nucleus Link' : '');
+    row.machine = { 'Nucleus Link': 'Link', 'Kaffelogic Nano 7': 'Kaffelogic' }[row.machine] || row.machine;
+
+    var drop = rec.drop && rec.drop.time ? rec.drop : null;
+    row.drop = tt(drop) || '—';
+
+    var fcRec = rec.fcStart && rec.fcStart.time ? rec.fcStart : null;
+    var fcPred = pred.fcStart && pred.fcStart.time ? pred.fcStart : null;
+    // a first crack recorded in the report is the actual one; the expected column always shows the machine's prediction
+    row.fcActual = fcRec ? tt(fcRec) : '';
+    row.fcStart = fcPred ? tt(fcPred) : '—';
+    row.fcEnd = tt(rec.fcEnd) || '—';
+    row.scStart = tt(rec.scStart) || '—';
+    row.scEnd = tt(rec.scEnd) || '—';
+    row.yellow = tt(rec.yellow) || (pred.yellow && pred.yellow.time ? tt(pred.yellow) + '\n(預期)' : '—');
+
+    // DTR
+    var dropS = drop ? C.mmss(drop.time) : null, fcS = fcRec ? C.mmss(fcRec.time) : null, est = false;
+    if (fcS == null && fcPred) { fcS = C.mmss(fcPred.time); est = true; }
+    if (devRec && devRec.pct && !est) row.dtr = devRec.pct;
+    else if (dropS && fcS != null && dropS > fcS) row.dtr = ((dropS - fcS) / dropS * 100).toFixed(1) + '%' + (est ? '\n(依預期一爆推估)' : '');
+    else row.dtr = '—';
+
+    // Fan curve steps
+    var steps = [], lastStep = 0;
+    for (var i = 1; i <= 10; i++) {
+      var t = S['fan step' + i + ' time'], a = parseFloat(S['fan step' + i + ' adjust']);
+      // unused slots are "0:00 / 0"; a real step can start at 0:00, so only the adjust value decides
+      if (t && a) lastStep = Math.max(lastStep, C.mmss(t) || 0);
+      if (t && a) steps.push(t + ' ' + (a > 0 ? '+' : '') + (a * 100).toFixed(1).replace(/\.0$/, '') + '%');
+    }
+    row.fanCurve = steps.length ? steps.join('\n') : '無調整';
+
+    // Fan speed from chart image
+    row.fanSpeed = '讀不到風扇圖';
+    var best = null, fanSeries = [], fanAdj = [];
+    (ex.images || []).forEach(function (imgs) { imgs.forEach(function (img) {
+      if (!img || !img.data) return;
+      try { var f = C.analyzeFan(img, T); if (!f.error && !best && f.yMax > 400) best = f; } catch (e) { }
+    }); });
+    if (best) {
+      function val(sec) { var r = best.read(sec); return r.adj != null ? r.adj : r.base; }
+      var parts = ['起 ' + val(3)];
+      if (fcS != null) parts.push('一爆 ' + val(fcS));
+      if (dropS) parts.push('下豆 ' + val(dropS));
+      row.fanSpeed = parts.join('\n');
+      // fan steps can come after the drop: read the fan curve until past the last one
+      var fb = best.seriesBoth(Math.max(dropS || 600, lastStep ? lastStep + 25 : 0)); fanSeries = fb.base; fanAdj = fb.adj;
+    }
+    // Charge temperature + AUC from the roast chart
+    row.charge = '—'; row.auc = '—';
+    var roast = null;
+    (ex.images || []).forEach(function (imgs) { imgs.forEach(function (img) {
+      if (roast || !img || !img.data) return;
+      try { roast = C.analyzeRoast(img, T, dropS); } catch (e) { }
+    }); });
+    if (roast) { row.charge = roast.charge.toFixed(1) + '°C'; row.auc = Math.round(roast.auc) + ' °C·min'; }
+    row._curves = { temp: roast ? roast.temp : [], ror: roast ? roast.ror : [], fan: fanSeries, fanAdj: fanAdj, fc: fcS, fcEst: est, drop: roast ? roast.endT : dropS };
+    return row;
+  }
+  return { COLUMNS: COLUMNS, build: build };
+})();
+
+
+var TEMPLATES = {"0":[{"v":[0,15,112,224,255,255,242,149,35,0,6,56,157,184,160,145,175,177,85,21,38,126,192,100,32,18,66,174,160,87,99,171,163,42,0,0,16,126,193,166,132,187,148,28,0,0,8,109,200,199,146,191,141,23,0,0,6,102,200,207,167,198,131,17,0,0,4,93,199,220,167,198,131,17,0,0,4,93,199,220,145,191,141,23,0,0,7,104,200,206,131,186,148,28,0,0,9,111,201,198,97,170,163,42,0,0,18,129,193,164,37,125,191,101,33,21,70,177,160,85,6,55,156,185,160,148,177,177,84,21,0,14,110,224,255,255,241,146,33,0],"w":8,"h":11}],"1":[{"v":[74,123,195,226,243,164,76,30,0,0,102,136,181,202,233,164,76,30,0,0,65,75,100,136,206,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,0,0,33,93,188,164,76,30,0,0,20,27,62,114,197,177,100,59,24,16,97,129,173,195,230,222,189,172,122,84,154,205,255,255,255,255,255,255,196,136],"w":6.79,"h":11}],"2":[{"v":[68,139,231,253,254,255,255,228,116,32,74,122,158,145,142,164,189,207,167,107,40,52,42,19,16,38,65,150,220,205,0,0,0,0,0,5,10,114,219,219,0,0,0,0,0,6,11,117,216,209,0,0,0,0,0,28,56,147,205,173,0,0,0,0,17,104,173,197,147,74,0,0,20,39,98,183,210,155,54,7,0,18,98,161,184,149,92,49,3,0,0,35,157,244,207,89,8,4,0,0,14,83,188,225,158,47,4,2,0,0,88,166,219,195,128,59,56,56,53,50,160,207,237,219,201,184,184,184,174,164,171,213,255,255,255,255,255,255,241,227],"w":7,"h":11}],"3":[{"v":[181,218,255,255,255,252,244,197,87,19,139,152,155,141,143,183,219,216,126,49,49,43,27,13,15,78,154,216,172,95,0,0,0,0,1,64,150,213,164,84,0,0,0,0,1,87,186,230,150,55,4,27,61,78,93,155,199,187,99,30,10,71,154,181,205,234,219,153,53,6,6,44,92,104,115,163,196,191,120,61,0,0,0,0,3,50,109,183,190,147,0,0,0,0,0,16,52,146,199,180,0,0,0,0,0,22,69,159,203,180,57,47,26,15,22,82,143,204,188,135,164,164,154,143,150,193,220,210,123,53,215,235,255,255,255,250,238,185,76,14],"w":6.71,"h":11}],"4":[{"v":[0,0,0,0,0,63,156,211,86,0,0,0,0,6,10,143,198,212,87,0,0,0,1,49,96,227,232,205,87,0,0,0,28,133,211,152,178,190,87,0,0,0,53,178,250,73,132,183,87,0,0,12,99,184,192,37,114,183,87,0,6,68,174,145,71,0,96,183,87,0,79,155,200,112,58,54,129,199,122,52,158,202,218,181,173,173,205,234,199,168,173,206,238,238,238,238,246,252,241,231,87,102,119,119,119,122,177,222,164,116,0,0,0,0,0,6,108,193,87,0,0,0,0,0,0,6,108,193,87,0,0,0,0,0,0,6,108,193,87,0],"w":8,"h":11}],"5":[{"v":[205,230,255,255,255,255,255,255,220,184,205,215,225,203,182,181,181,181,155,129,205,188,170,113,56,54,54,54,45,37,205,176,146,74,2,0,0,0,0,0,205,176,146,74,2,0,0,0,0,0,205,199,193,147,101,73,46,20,10,0,144,160,177,178,179,192,165,138,85,33,42,50,57,68,79,150,191,232,177,122,0,0,0,0,0,33,123,213,204,194,0,0,0,0,0,3,101,198,204,211,0,0,0,0,0,21,114,207,206,205,35,26,18,21,26,99,165,233,192,151,145,145,145,149,153,203,200,197,129,61,220,238,255,255,255,246,197,147,83,19],"w":6,"h":11}],"6":[{"v":[0,4,84,207,253,255,255,254,158,63,0,45,147,189,174,134,142,164,115,51,21,117,202,120,47,7,15,38,36,19,85,170,174,46,0,12,7,1,0,0,127,191,153,25,0,24,13,1,0,0,143,199,169,100,117,140,131,92,31,0,172,213,213,169,167,163,191,204,117,46,179,217,207,104,50,36,75,185,195,136,158,207,163,36,0,0,9,130,217,192,144,200,154,26,0,0,0,115,217,203,113,184,172,44,0,0,6,127,213,184,43,140,207,103,29,20,58,175,183,113,2,64,174,189,157,147,177,192,104,30,0,17,125,235,255,255,250,173,50,0],"w":8,"h":11}],"7":[{"v":[203,229,255,255,255,255,255,255,255,255,154,173,193,193,193,193,193,208,239,255,52,59,66,66,66,69,72,140,213,218,0,0,0,0,0,39,77,156,170,105,0,0,0,0,0,71,142,193,136,29,0,0,0,0,12,111,197,188,96,15,0,0,1,1,63,181,237,148,30,0,0,0,25,51,139,191,154,78,2,0,0,3,85,164,200,140,44,22,0,0,0,5,120,229,223,109,1,1,0,0,0,32,153,242,203,82,1,0,0,0,0,81,208,254,159,32,0,0,0,0,9,119,229,229,119,5,0,0,0,0,18,136,230,205,103,0,0,0,0,0],"w":7,"h":11}],"8":[{"v":[9,65,173,238,253,253,244,189,72,4,40,108,176,163,147,156,185,199,115,34,104,166,159,58,20,32,81,185,161,67,113,175,172,72,24,21,76,176,141,43,88,169,205,116,47,36,115,193,119,14,50,125,203,185,144,128,170,164,71,7,11,80,198,246,241,237,235,147,32,0,73,130,172,140,134,200,229,202,100,36,170,182,116,21,14,78,128,202,184,120,203,183,83,2,0,8,41,159,210,169,213,191,88,3,0,4,27,145,212,180,205,205,136,48,24,32,66,167,189,134,118,167,202,173,152,160,186,197,117,40,48,122,226,255,255,255,251,191,69,3],"w":7.5,"h":11}],"9":[{"v":[0,32,147,242,255,255,247,152,33,0,11,81,182,184,154,144,181,188,85,13,66,156,191,81,27,16,77,195,166,81,129,192,153,26,0,0,21,147,208,164,148,202,142,14,0,0,5,130,221,193,135,195,157,29,0,0,12,137,230,208,79,165,201,94,38,31,72,184,240,225,18,89,192,194,165,156,161,207,229,212,0,19,79,133,148,132,107,164,213,178,0,0,2,22,40,13,16,137,208,160,0,0,1,11,20,7,37,161,182,110,2,25,36,16,9,47,114,199,123,30,7,91,163,144,136,172,187,147,46,0,11,132,254,255,255,251,204,82,3,0],"w":8,"h":11}],":":[{"v":[185,185,185,185,185,204,204,204,204,204,138,138,138,138,138,153,153,153,153,153,90,90,90,90,90,100,100,100,100,100,45,45,45,45,45,50,50,50,50,50,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,57,57,57,57,63,63,63,63,63,114,114,114,114,114,125,125,125,125,125,149,149,149,149,149,164,164,164,164,164,184,184,184,184,184,204,204,204,204,204],"w":2,"h":8}]};
+var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A)","designer":"Sam Corra","machine":"Link","drop":"6:57\n215.9°C","fcActual":"","fcStart":"6:10\n210.5°C","fcEnd":"—","scStart":"—","scEnd":"—","yellow":"—","dtr":"11.3%\n(依預期一爆推估)","fanCurve":"6:23 +1.5%\n6:38 +0.5%","fanSpeed":"起 1470\n一爆 1410\n下豆 1413","charge":"32.4°C","auc":"921 °C·min","_curves":{"temp":[{"t":0.3,"v":32.4},{"t":1.4,"v":33.4},{"t":2.5,"v":34.8},{"t":3.6,"v":36.8},{"t":4.7,"v":38.8},{"t":5.8,"v":41},{"t":7,"v":43.1},{"t":8.1,"v":45.4},{"t":9.2,"v":47.5},{"t":10.3,"v":49.6},{"t":11.4,"v":51.8},{"t":12.6,"v":54.1},{"t":13.7,"v":56.2},{"t":14.8,"v":58.4},{"t":15.9,"v":60.7},{"t":17,"v":62.9},{"t":18.1,"v":65.2},{"t":19.3,"v":67.2},{"t":20.4,"v":69.4},{"t":21.5,"v":71.4},{"t":22.6,"v":73.2},{"t":23.7,"v":75},{"t":24.8,"v":76},{"t":26,"v":77.8},{"t":27.1,"v":78.7},{"t":28.2,"v":80.5},{"t":29.3,"v":81.6},{"t":31,"v":83.9},{"t":32.1,"v":84.7},{"t":33.2,"v":85.7},{"t":34.3,"v":86.6},{"t":35.4,"v":87.4},{"t":36.6,"v":88.4},{"t":37.7,"v":89.2},{"t":38.8,"v":90.1},{"t":39.9,"v":91.2},{"t":41,"v":92.2},{"t":42.1,"v":93.2},{"t":43.3,"v":94.3},{"t":44.4,"v":95.3},{"t":45.5,"v":96.3},{"t":46.6,"v":97.2},{"t":47.7,"v":98.1},{"t":48.8,"v":99.1},{"t":50,"v":99.9},{"t":51.1,"v":100.9},{"t":52.2,"v":101.7},{"t":53.3,"v":102.6},{"t":54.4,"v":103.6},{"t":55.6,"v":104.5},{"t":56.7,"v":105.4},{"t":57.8,"v":106.2},{"t":58.9,"v":107.1},{"t":60,"v":107.8},{"t":61.1,"v":108.8},{"t":62.3,"v":109.3},{"t":63.4,"v":110.3},{"t":64.5,"v":111.3},{"t":65.6,"v":112},{"t":66.7,"v":113.1},{"t":67.8,"v":114},{"t":69,"v":114.7},{"t":70.1,"v":115.5},{"t":71.2,"v":116.4},{"t":72.3,"v":117.1},{"t":73.4,"v":117.8},{"t":74.5,"v":118.3},{"t":75.7,"v":119.2},{"t":76.8,"v":119.7},{"t":77.9,"v":120.4},{"t":79,"v":121.1},{"t":80.1,"v":121.7},{"t":81.2,"v":122.5},{"t":82.4,"v":123.2},{"t":83.5,"v":123.9},{"t":84.6,"v":124.5},{"t":85.7,"v":125.4},{"t":86.8,"v":126.1},{"t":87.9,"v":126.9},{"t":89.1,"v":127.7},{"t":90.2,"v":128.7},{"t":91.3,"v":129.3},{"t":92.4,"v":130.1},{"t":93.5,"v":131},{"t":94.6,"v":131.7},{"t":95.8,"v":132.2},{"t":96.9,"v":132.9},{"t":98,"v":133.5},{"t":99.1,"v":134.3},{"t":100.2,"v":134.9},{"t":101.3,"v":135.6},{"t":102.5,"v":136.3},{"t":103.6,"v":137.2},{"t":104.7,"v":137.7},{"t":105.8,"v":138.3},{"t":106.9,"v":139},{"t":108,"v":139.5},{"t":109.2,"v":140.1},{"t":110.3,"v":140.8},{"t":111.4,"v":141.5},{"t":112.5,"v":142.2},{"t":113.6,"v":142.8},{"t":114.7,"v":143.2},{"t":115.9,"v":143.8},{"t":117,"v":143.9},{"t":118.1,"v":143.8},{"t":119.2,"v":144.3},{"t":120.3,"v":144.9},{"t":121.4,"v":145},{"t":122.6,"v":146},{"t":123.7,"v":147.3},{"t":124.8,"v":147.8},{"t":125.9,"v":148.4},{"t":127,"v":149.1},{"t":128.1,"v":149.7},{"t":129.3,"v":150.2},{"t":130.4,"v":150.8},{"t":131.5,"v":151.2},{"t":132.6,"v":151.8},{"t":133.7,"v":152.5},{"t":134.8,"v":153},{"t":136,"v":153.6},{"t":137.1,"v":154},{"t":138.2,"v":155},{"t":139.3,"v":155.9},{"t":140.4,"v":156.4},{"t":141.6,"v":156.7},{"t":142.7,"v":157},{"t":143.8,"v":157.5},{"t":144.9,"v":157.8},{"t":146,"v":158.1},{"t":147.1,"v":158.7},{"t":148.3,"v":159.2},{"t":149.4,"v":159.8},{"t":150.5,"v":160.3},{"t":151.6,"v":160.6},{"t":152.7,"v":161.1},{"t":153.8,"v":161.3},{"t":155,"v":161.2},{"t":156.1,"v":161.8},{"t":157.2,"v":162.3},{"t":158.3,"v":162.7},{"t":159.4,"v":162.7},{"t":160.5,"v":163},{"t":161.7,"v":163.4},{"t":162.8,"v":163.7},{"t":163.9,"v":163.9},{"t":165,"v":164.3},{"t":166.1,"v":164.8},{"t":167.2,"v":165.1},{"t":168.4,"v":165.7},{"t":169.5,"v":166.1},{"t":170.6,"v":166.7},{"t":171.7,"v":167.2},{"t":172.8,"v":167.7},{"t":173.9,"v":168.1},{"t":175.1,"v":168.6},{"t":176.2,"v":169.6},{"t":177.3,"v":170},{"t":178.4,"v":170.9},{"t":179.5,"v":171.2},{"t":180.6,"v":171.2},{"t":181.8,"v":171.5},{"t":182.9,"v":171.9},{"t":184,"v":171.7},{"t":185.1,"v":172},{"t":186.2,"v":172.2},{"t":187.3,"v":172.4},{"t":188.5,"v":172.7},{"t":189.6,"v":173},{"t":190.7,"v":173.3},{"t":191.8,"v":173.6},{"t":192.9,"v":174},{"t":194,"v":174.5},{"t":195.2,"v":175},{"t":196.3,"v":175.5},{"t":197.4,"v":175.8},{"t":198.5,"v":176.1},{"t":199.6,"v":176.4},{"t":200.7,"v":176.7},{"t":201.9,"v":176.9},{"t":203,"v":177.2},{"t":204.1,"v":177.5},{"t":205.2,"v":178.1},{"t":206.3,"v":178.3},{"t":207.4,"v":178.9},{"t":208.6,"v":179.3},{"t":209.7,"v":179.6},{"t":210.8,"v":180.4},{"t":211.9,"v":180.6},{"t":213,"v":181.2},{"t":214.1,"v":181.4},{"t":215.3,"v":181.6},{"t":216.4,"v":182},{"t":217.5,"v":182.4},{"t":218.6,"v":182.7},{"t":219.7,"v":182.8},{"t":220.8,"v":183.3},{"t":222,"v":183.4},{"t":223.1,"v":183.7},{"t":224.2,"v":184.1},{"t":225.3,"v":184.2},{"t":226.4,"v":184.8},{"t":227.5,"v":184.8},{"t":228.7,"v":185.2},{"t":229.8,"v":185.4},{"t":230.9,"v":185.9},{"t":232,"v":185.9},{"t":233.1,"v":186.4},{"t":234.3,"v":186.5},{"t":235.4,"v":187.1},{"t":236.5,"v":187.8},{"t":237.6,"v":188},{"t":238.7,"v":188.3},{"t":239.8,"v":188.6},{"t":241,"v":188.9},{"t":242.1,"v":189},{"t":243.2,"v":189.3},{"t":244.3,"v":189.6},{"t":245.4,"v":189.9},{"t":246.5,"v":190.3},{"t":247.7,"v":190.7},{"t":248.8,"v":191},{"t":249.9,"v":191.1},{"t":251,"v":191.3},{"t":252.1,"v":191.6},{"t":253.2,"v":191.8},{"t":254.4,"v":192.1},{"t":255.5,"v":192.4},{"t":256.6,"v":192.7},{"t":257.7,"v":193},{"t":258.8,"v":193.2},{"t":259.9,"v":193.2},{"t":261.1,"v":193.5},{"t":262.2,"v":193.8},{"t":263.3,"v":194.1},{"t":264.4,"v":194.4},{"t":265.5,"v":194.6},{"t":266.6,"v":195.1},{"t":267.8,"v":195.5},{"t":268.9,"v":195.8},{"t":270,"v":196},{"t":271.1,"v":196.2},{"t":272.2,"v":196.3},{"t":273.3,"v":196.3},{"t":274.5,"v":196.3},{"t":275.6,"v":196.3},{"t":276.7,"v":196.3},{"t":277.8,"v":196.6},{"t":278.9,"v":196.8},{"t":280,"v":196.9},{"t":281.2,"v":197.2},{"t":282.3,"v":197.5},{"t":283.4,"v":197.7},{"t":284.5,"v":197.7},{"t":285.6,"v":198},{"t":286.7,"v":198},{"t":287.9,"v":198.3},{"t":289,"v":198.6},{"t":290.1,"v":198.9},{"t":291.2,"v":199.4},{"t":292.3,"v":199.7},{"t":293.4,"v":200},{"t":294.6,"v":200.3},{"t":295.7,"v":200.3},{"t":296.8,"v":200.5},{"t":297.9,"v":200.5},{"t":299,"v":200.8},{"t":300.1,"v":201.2},{"t":301.3,"v":201.4},{"t":302.4,"v":201.4},{"t":303.5,"v":201.7},{"t":304.6,"v":201.7},{"t":305.7,"v":201.7},{"t":306.8,"v":202},{"t":308,"v":202.2},{"t":309.1,"v":202.5},{"t":310.2,"v":202.8},{"t":311.3,"v":203.1},{"t":312.4,"v":203.4},{"t":313.5,"v":203.4},{"t":314.7,"v":203.6},{"t":315.8,"v":204.3},{"t":316.9,"v":204.9},{"t":318,"v":205.3},{"t":319.1,"v":205.9},{"t":320.3,"v":205.9},{"t":321.4,"v":206.2},{"t":322.5,"v":205.9},{"t":323.6,"v":205.6},{"t":324.7,"v":205.6},{"t":325.8,"v":205.5},{"t":327,"v":205.5},{"t":328.1,"v":205.3},{"t":329.2,"v":205.5},{"t":330.3,"v":205.6},{"t":331.4,"v":205.6},{"t":332.5,"v":205.6},{"t":333.7,"v":205.7},{"t":334.8,"v":206},{"t":335.9,"v":206.2},{"t":337,"v":206.3},{"t":338.1,"v":206.4},{"t":339.2,"v":206.7},{"t":340.4,"v":207},{"t":341.5,"v":207.3},{"t":342.6,"v":207.6},{"t":343.7,"v":207.6},{"t":344.8,"v":208.1},{"t":345.9,"v":208.4},{"t":347.1,"v":208.7},{"t":348.2,"v":208.7},{"t":349.3,"v":209},{"t":350.4,"v":209.4},{"t":351.5,"v":207.7},{"t":352.6,"v":209.7},{"t":353.8,"v":210},{"t":354.9,"v":208.3},{"t":356,"v":208.6},{"t":357.1,"v":210.5},{"t":358.2,"v":210.5},{"t":359.3,"v":210.8},{"t":360.5,"v":210.8},{"t":361.6,"v":211.1},{"t":362.7,"v":209.4},{"t":363.8,"v":211.4},{"t":364.9,"v":211.6},{"t":366,"v":210},{"t":367.2,"v":211.9},{"t":368.3,"v":211.9},{"t":369.4,"v":211.9},{"t":371.6,"v":211.9},{"t":372.7,"v":211.9},{"t":373.9,"v":210.8},{"t":375,"v":212.5},{"t":376.1,"v":212.8},{"t":377.2,"v":213.1},{"t":378.3,"v":213.3},{"t":379.4,"v":211.6},{"t":380.6,"v":213.9},{"t":381.7,"v":213.9},{"t":382.8,"v":211.9},{"t":383.9,"v":212.2},{"t":385,"v":214.2},{"t":386.1,"v":214.3},{"t":387.3,"v":214.3},{"t":388.4,"v":214},{"t":389.5,"v":214},{"t":390.6,"v":214},{"t":391.7,"v":214},{"t":392.8,"v":213.9},{"t":394,"v":213.5},{"t":395.1,"v":213.8},{"t":396.2,"v":213.8},{"t":397.3,"v":213.9},{"t":398.4,"v":213.6},{"t":399.5,"v":213.6},{"t":400.7,"v":213.8},{"t":401.8,"v":213.9},{"t":402.9,"v":214.2},{"t":404,"v":214.6},{"t":405.1,"v":214.5},{"t":406.3,"v":215},{"t":407.4,"v":215.6},{"t":408.5,"v":215.4},{"t":409.6,"v":215.6},{"t":410.7,"v":215.4},{"t":411.8,"v":215.9},{"t":413,"v":216},{"t":414.1,"v":215.6},{"t":415.2,"v":215.4},{"t":416.3,"v":214.2}],"ror":[{"t":0.3,"v":53.4},{"t":1.4,"v":57.7},{"t":2.5,"v":62.2},{"t":3.6,"v":66.5},{"t":4.7,"v":70.4},{"t":5.8,"v":74.5},{"t":7,"v":78.3},{"t":8.1,"v":82.1},{"t":9.2,"v":85.4},{"t":10.3,"v":88.5},{"t":11.4,"v":91.5},{"t":12.6,"v":93.6},{"t":13.7,"v":95.4},{"t":14.8,"v":96.5},{"t":15.9,"v":97.2},{"t":17,"v":97.2},{"t":18.1,"v":96.5},{"t":19.3,"v":95.4},{"t":20.4,"v":93.9},{"t":21.5,"v":91.9},{"t":22.6,"v":89.8},{"t":23.7,"v":87.4},{"t":24.8,"v":85},{"t":26,"v":82.6},{"t":27.1,"v":80.1},{"t":28.2,"v":77.7},{"t":29.3,"v":75.3},{"t":30.4,"v":72.6},{"t":31.5,"v":70.5},{"t":32.7,"v":68.1},{"t":33.8,"v":65.8},{"t":34.9,"v":63.6},{"t":36,"v":61.5},{"t":37.1,"v":59.6},{"t":38.2,"v":58},{"t":39.4,"v":56.5},{"t":40.5,"v":55.1},{"t":41.6,"v":53.8},{"t":42.7,"v":52.8},{"t":43.8,"v":52},{"t":44.9,"v":51.3},{"t":46.1,"v":50.6},{"t":47.2,"v":50.2},{"t":48.3,"v":49.7},{"t":49.4,"v":49.5},{"t":50.5,"v":49.2},{"t":51.6,"v":48.9},{"t":52.8,"v":48.6},{"t":53.9,"v":48.3},{"t":55,"v":48},{"t":56.1,"v":47.5},{"t":57.2,"v":47.2},{"t":58.3,"v":46.6},{"t":59.5,"v":46.1},{"t":60.6,"v":45.5},{"t":61.7,"v":45},{"t":62.8,"v":44.5},{"t":63.9,"v":44.1},{"t":65,"v":43.6},{"t":66.2,"v":43},{"t":67.3,"v":42.7},{"t":68.4,"v":42.4},{"t":69.5,"v":41.9},{"t":70.6,"v":41.9},{"t":71.7,"v":41.6},{"t":72.9,"v":41.3},{"t":74,"v":41.3},{"t":75.1,"v":41},{"t":76.2,"v":41},{"t":77.3,"v":40.7},{"t":78.4,"v":40.7},{"t":79.6,"v":40.5},{"t":80.7,"v":40.2},{"t":81.8,"v":39.9},{"t":82.9,"v":39.6},{"t":84,"v":39.3},{"t":85.1,"v":39.1},{"t":86.3,"v":38.8},{"t":87.9,"v":38.5},{"t":89.1,"v":38.5},{"t":90.2,"v":40.5},{"t":91.3,"v":38.2},{"t":92.4,"v":38.2},{"t":93.5,"v":39.6},{"t":94.6,"v":37.9},{"t":95.8,"v":37.6},{"t":96.9,"v":37.4},{"t":98,"v":37.1},{"t":99.1,"v":36.5},{"t":100.2,"v":36.1},{"t":101.3,"v":35.4},{"t":102.5,"v":34.8},{"t":103.6,"v":34.1},{"t":104.7,"v":33.4},{"t":105.8,"v":32.9},{"t":106.9,"v":32.6},{"t":108,"v":32},{"t":109.7,"v":31.7},{"t":110.8,"v":33.7},{"t":112,"v":31.5},{"t":113.1,"v":31.5},{"t":114.2,"v":31.2},{"t":115.3,"v":31.2},{"t":116.4,"v":30.9},{"t":117.5,"v":30.9},{"t":118.7,"v":30.6},{"t":119.8,"v":30.6},{"t":120.9,"v":30.6},{"t":122,"v":30.3},{"t":123.1,"v":30.3},{"t":124.2,"v":30.3},{"t":125.4,"v":30.1},{"t":126.5,"v":30.1},{"t":129.8,"v":29.8},{"t":130.9,"v":29.8},{"t":132.1,"v":29.8},{"t":133.2,"v":29.8},{"t":134.3,"v":28.9},{"t":135.4,"v":29.5},{"t":136.5,"v":29.2},{"t":137.6,"v":28.9},{"t":138.8,"v":28.7},{"t":139.9,"v":28.1},{"t":141,"v":27.5},{"t":142.1,"v":26.8},{"t":143.2,"v":26.1},{"t":144.3,"v":25.6},{"t":145.5,"v":25},{"t":146.6,"v":24.4},{"t":147.7,"v":23.9},{"t":148.8,"v":23.3},{"t":149.9,"v":22.9},{"t":151,"v":22.5},{"t":152.2,"v":22.2},{"t":153.8,"v":21.6},{"t":155,"v":21.6},{"t":156.6,"v":21.6},{"t":157.7,"v":21.6},{"t":158.9,"v":21.6},{"t":160,"v":21.9},{"t":161.7,"v":22.2},{"t":162.8,"v":22.2},{"t":163.9,"v":22.2},{"t":165,"v":22.2},{"t":166.1,"v":21.9},{"t":167.2,"v":21.6},{"t":168.4,"v":21.3},{"t":169.5,"v":21.1},{"t":170.6,"v":20.8},{"t":171.7,"v":20.8},{"t":172.8,"v":20.5},{"t":173.9,"v":20.5},{"t":175.1,"v":20.5},{"t":176.2,"v":20.5},{"t":177.3,"v":20.5},{"t":179.5,"v":20.8},{"t":180.6,"v":20.8},{"t":181.8,"v":20.2},{"t":182.9,"v":20.5},{"t":184,"v":20.2},{"t":185.1,"v":19.9},{"t":186.2,"v":19.7},{"t":187.9,"v":19.1},{"t":189,"v":18.8},{"t":190.1,"v":19.1},{"t":191.3,"v":18.3},{"t":192.4,"v":18},{"t":193.5,"v":18},{"t":194.6,"v":18},{"t":195.7,"v":18.5},{"t":196.8,"v":18.3},{"t":198,"v":18.5},{"t":199.1,"v":18.8},{"t":200.2,"v":19.1},{"t":201.3,"v":19.4},{"t":202.4,"v":19.4},{"t":203.5,"v":19.7},{"t":204.7,"v":19.7},{"t":205.8,"v":19.7},{"t":206.9,"v":19.4},{"t":208,"v":19.4},{"t":209.1,"v":19.1},{"t":210.2,"v":18.8},{"t":211.4,"v":18.5},{"t":212.5,"v":18.5},{"t":213.6,"v":18.3},{"t":214.7,"v":16.6},{"t":215.8,"v":18},{"t":216.9,"v":18},{"t":218.1,"v":18},{"t":219.2,"v":18},{"t":220.3,"v":17.7},{"t":221.4,"v":17.7},{"t":222.5,"v":16},{"t":223.6,"v":17.4},{"t":224.8,"v":17.1},{"t":225.9,"v":17.1},{"t":227,"v":16.8},{"t":228.1,"v":16.8},{"t":229.2,"v":15.4},{"t":230.3,"v":16.6},{"t":231.5,"v":16.6},{"t":232.6,"v":16.3},{"t":233.7,"v":16.3},{"t":234.8,"v":16.3},{"t":235.9,"v":16},{"t":237,"v":16},{"t":238.2,"v":16},{"t":239.3,"v":16},{"t":240.4,"v":16},{"t":241.5,"v":16},{"t":242.6,"v":13.8},{"t":243.7,"v":13.5},{"t":244.9,"v":15.7},{"t":246,"v":15.7},{"t":247.1,"v":15.7},{"t":248.8,"v":15.4},{"t":249.9,"v":15.4},{"t":251,"v":15.4},{"t":252.1,"v":15.2},{"t":253.2,"v":15.2},{"t":254.4,"v":14.9},{"t":255.5,"v":14.6},{"t":256.6,"v":14.3},{"t":257.7,"v":14},{"t":258.8,"v":13.5},{"t":259.9,"v":13.2},{"t":261.1,"v":12.9},{"t":262.2,"v":12.6},{"t":263.3,"v":12.3},{"t":264.4,"v":12.1},{"t":265.5,"v":11.8},{"t":267.2,"v":11.5},{"t":268.3,"v":11.5},{"t":270.5,"v":11.2},{"t":271.7,"v":11.2},{"t":272.8,"v":11.2},{"t":273.9,"v":11.2},{"t":275,"v":11.2},{"t":276.1,"v":11.2},{"t":277.3,"v":11.2},{"t":280,"v":10.9},{"t":281.2,"v":10.9},{"t":283.4,"v":10.7},{"t":284.5,"v":10.7},{"t":285.6,"v":10.7},{"t":286.7,"v":10.7},{"t":287.9,"v":10.7},{"t":289,"v":10.7},{"t":290.1,"v":10.9},{"t":291.2,"v":10.9},{"t":292.3,"v":10.7},{"t":293.4,"v":11.2},{"t":294.6,"v":10.5},{"t":295.7,"v":11.5},{"t":296.8,"v":11.8},{"t":297.9,"v":12.1},{"t":299,"v":12.3},{"t":300.1,"v":12.6},{"t":301.3,"v":12.9},{"t":302.4,"v":12.9},{"t":303.5,"v":10.1},{"t":304.6,"v":12.9},{"t":306.3,"v":12.6},{"t":307.4,"v":12.3},{"t":308.5,"v":11.8},{"t":309.6,"v":11.2},{"t":310.8,"v":10.7},{"t":311.9,"v":10.1},{"t":313,"v":9.5},{"t":314.1,"v":9.3},{"t":315.2,"v":9},{"t":316.3,"v":8.7},{"t":317.5,"v":8.7},{"t":318.6,"v":9.8},{"t":319.7,"v":8.4},{"t":320.8,"v":8.4},{"t":321.9,"v":8.4},{"t":323,"v":8.4},{"t":324.2,"v":8.4},{"t":325.3,"v":8.4},{"t":326.4,"v":8.4},{"t":327.5,"v":8.1},{"t":328.6,"v":8.1},{"t":329.7,"v":7.9},{"t":330.9,"v":9.3},{"t":332,"v":7.6},{"t":333.1,"v":7.6},{"t":334.2,"v":7.6},{"t":335.3,"v":7.6},{"t":336.4,"v":7.9},{"t":337.6,"v":8.1},{"t":338.7,"v":8.4},{"t":339.8,"v":8.7},{"t":340.9,"v":9.3},{"t":342,"v":9.7},{"t":343.1,"v":10.1},{"t":344.3,"v":10.4},{"t":345.4,"v":10.7},{"t":346.5,"v":10.9},{"t":347.6,"v":10.9},{"t":348.7,"v":10.9},{"t":349.8,"v":10.9},{"t":351,"v":10.9},{"t":352.1,"v":10.7},{"t":353.2,"v":10.4},{"t":354.3,"v":10.4},{"t":355.4,"v":10.1},{"t":356.5,"v":9.8},{"t":357.7,"v":9.5},{"t":358.8,"v":9.3},{"t":359.9,"v":9.3},{"t":361,"v":8.4},{"t":362.1,"v":9},{"t":363.3,"v":9},{"t":364.4,"v":9},{"t":365.5,"v":8.7},{"t":366.6,"v":8.1},{"t":367.7,"v":8.4},{"t":369.4,"v":8.1},{"t":371.6,"v":7.6},{"t":372.7,"v":7.3},{"t":373.9,"v":6.7},{"t":375,"v":6.4},{"t":376.1,"v":5.9},{"t":377.2,"v":5.6},{"t":378.3,"v":5.3},{"t":380,"v":4.8},{"t":381.1,"v":4.5},{"t":382.2,"v":4.5},{"t":383.4,"v":4.2},{"t":384.5,"v":4.2},{"t":385.6,"v":4.2},{"t":386.7,"v":4.2},{"t":387.8,"v":4.2},{"t":388.9,"v":4.2},{"t":390.1,"v":4.2},{"t":391.7,"v":3.9},{"t":392.8,"v":3.9},{"t":394,"v":3.6},{"t":395.1,"v":3.1},{"t":396.2,"v":2.1},{"t":397.3,"v":0.4}],"fan":[{"t":0,"v":1470},{"t":1,"v":1470},{"t":2,"v":1470},{"t":3,"v":1470},{"t":4,"v":1470},{"t":5,"v":1470},{"t":6,"v":1470},{"t":7,"v":1470},{"t":8,"v":1470},{"t":9,"v":1470},{"t":10,"v":1470},{"t":11,"v":1470},{"t":12,"v":1470},{"t":13,"v":1470},{"t":14,"v":1470},{"t":15,"v":1470},{"t":16,"v":1470},{"t":17,"v":1470},{"t":18,"v":1470},{"t":19,"v":1470},{"t":20,"v":1470},{"t":21,"v":1470},{"t":22,"v":1470},{"t":23,"v":1470},{"t":24,"v":1470},{"t":25,"v":1470},{"t":26,"v":1470},{"t":27,"v":1470},{"t":28,"v":1470},{"t":29,"v":1470},{"t":30,"v":1470},{"t":31,"v":1470},{"t":32,"v":1470},{"t":33,"v":1470},{"t":34,"v":1470},{"t":35,"v":1470},{"t":36,"v":1470},{"t":37,"v":1470},{"t":38,"v":1470},{"t":39,"v":1470},{"t":40,"v":1470},{"t":41,"v":1470},{"t":42,"v":1470},{"t":43,"v":1470},{"t":44,"v":1470},{"t":45,"v":1470},{"t":46,"v":1470},{"t":47,"v":1470},{"t":48,"v":1470},{"t":49,"v":1470},{"t":50,"v":1470},{"t":51,"v":1470},{"t":52,"v":1470},{"t":53,"v":1470},{"t":54,"v":1470},{"t":55,"v":1470},{"t":56,"v":1470},{"t":57,"v":1470},{"t":58,"v":1470},{"t":59,"v":1470},{"t":60,"v":1470},{"t":61,"v":1470},{"t":62,"v":1470},{"t":63,"v":1470},{"t":64,"v":1470},{"t":65,"v":1470},{"t":66,"v":1470},{"t":67,"v":1470},{"t":68,"v":1470},{"t":69,"v":1470},{"t":70,"v":1470},{"t":71,"v":1470},{"t":72,"v":1470},{"t":73,"v":1470},{"t":74,"v":1470},{"t":75,"v":1470},{"t":76,"v":1470},{"t":77,"v":1470},{"t":78,"v":1470},{"t":79,"v":1470},{"t":80,"v":1470},{"t":81,"v":1470},{"t":82,"v":1470},{"t":83,"v":1470},{"t":84,"v":1470},{"t":85,"v":1470},{"t":86,"v":1470},{"t":87,"v":1470},{"t":88,"v":1470},{"t":89,"v":1470},{"t":90,"v":1470},{"t":91,"v":1470},{"t":92,"v":1470},{"t":93,"v":1470},{"t":94,"v":1469},{"t":95,"v":1469},{"t":96,"v":1469},{"t":97,"v":1469},{"t":98,"v":1469},{"t":99,"v":1469},{"t":100,"v":1469},{"t":101,"v":1469},{"t":102,"v":1469},{"t":103,"v":1469},{"t":104,"v":1469},{"t":105,"v":1469},{"t":106,"v":1469},{"t":107,"v":1469},{"t":108,"v":1469},{"t":109,"v":1469},{"t":110,"v":1469},{"t":111,"v":1469},{"t":112,"v":1469},{"t":113,"v":1469},{"t":114,"v":1469},{"t":115,"v":1469},{"t":116,"v":1469},{"t":117,"v":1469},{"t":118,"v":1469},{"t":119,"v":1468},{"t":120,"v":1468},{"t":121,"v":1468},{"t":122,"v":1468},{"t":123,"v":1468},{"t":124,"v":1468},{"t":125,"v":1468},{"t":126,"v":1468},{"t":127,"v":1468},{"t":128,"v":1468},{"t":129,"v":1468},{"t":130,"v":1468},{"t":131,"v":1468},{"t":132,"v":1468},{"t":133,"v":1468},{"t":134,"v":1468},{"t":135,"v":1467},{"t":136,"v":1467},{"t":137,"v":1467},{"t":138,"v":1467},{"t":139,"v":1467},{"t":140,"v":1467},{"t":141,"v":1467},{"t":142,"v":1467},{"t":143,"v":1467},{"t":144,"v":1467},{"t":145,"v":1467},{"t":146,"v":1467},{"t":147,"v":1467},{"t":148,"v":1467},{"t":149,"v":1466},{"t":150,"v":1466},{"t":151,"v":1466},{"t":152,"v":1466},{"t":153,"v":1466},{"t":154,"v":1466},{"t":155,"v":1466},{"t":156,"v":1466},{"t":157,"v":1466},{"t":158,"v":1466},{"t":159,"v":1466},{"t":160,"v":1466},{"t":161,"v":1465},{"t":162,"v":1465},{"t":163,"v":1465},{"t":164,"v":1465},{"t":165,"v":1465},{"t":166,"v":1465},{"t":167,"v":1465},{"t":168,"v":1465},{"t":169,"v":1465},{"t":170,"v":1465},{"t":171,"v":1465},{"t":172,"v":1464},{"t":173,"v":1464},{"t":174,"v":1464},{"t":175,"v":1464},{"t":176,"v":1464},{"t":177,"v":1464},{"t":178,"v":1464},{"t":179,"v":1464},{"t":180,"v":1464},{"t":181,"v":1464},{"t":182,"v":1463},{"t":183,"v":1463},{"t":184,"v":1463},{"t":185,"v":1463},{"t":186,"v":1463},{"t":187,"v":1463},{"t":188,"v":1463},{"t":189,"v":1463},{"t":190,"v":1463},{"t":191,"v":1462},{"t":192,"v":1462},{"t":193,"v":1462},{"t":194,"v":1462},{"t":195,"v":1462},{"t":196,"v":1462},{"t":197,"v":1462},{"t":198,"v":1462},{"t":199,"v":1462},{"t":200,"v":1461},{"t":201,"v":1461},{"t":202,"v":1461},{"t":203,"v":1461},{"t":204,"v":1461},{"t":205,"v":1461},{"t":206,"v":1461},{"t":207,"v":1460},{"t":208,"v":1460},{"t":209,"v":1460},{"t":210,"v":1460},{"t":211,"v":1460},{"t":212,"v":1460},{"t":213,"v":1460},{"t":214,"v":1460},{"t":215,"v":1459},{"t":216,"v":1459},{"t":217,"v":1459},{"t":218,"v":1459},{"t":219,"v":1459},{"t":220,"v":1459},{"t":221,"v":1458},{"t":222,"v":1458},{"t":223,"v":1458},{"t":224,"v":1458},{"t":225,"v":1458},{"t":226,"v":1458},{"t":227,"v":1458},{"t":228,"v":1457},{"t":229,"v":1457},{"t":230,"v":1457},{"t":231,"v":1457},{"t":232,"v":1457},{"t":233,"v":1457},{"t":234,"v":1457},{"t":235,"v":1456},{"t":236,"v":1456},{"t":237,"v":1456},{"t":238,"v":1456},{"t":239,"v":1456},{"t":240,"v":1456},{"t":241,"v":1455},{"t":242,"v":1455},{"t":243,"v":1455},{"t":244,"v":1455},{"t":245,"v":1455},{"t":246,"v":1454},{"t":247,"v":1454},{"t":248,"v":1454},{"t":249,"v":1454},{"t":250,"v":1454},{"t":251,"v":1453},{"t":252,"v":1453},{"t":253,"v":1453},{"t":254,"v":1453},{"t":255,"v":1453},{"t":256,"v":1453},{"t":257,"v":1452},{"t":258,"v":1452},{"t":259,"v":1452},{"t":260,"v":1452},{"t":261,"v":1451},{"t":262,"v":1451},{"t":263,"v":1451},{"t":264,"v":1451},{"t":265,"v":1451},{"t":266,"v":1450},{"t":267,"v":1450},{"t":268,"v":1450},{"t":269,"v":1450},{"t":270,"v":1450},{"t":271,"v":1449},{"t":272,"v":1449},{"t":273,"v":1449},{"t":274,"v":1449},{"t":275,"v":1448},{"t":276,"v":1448},{"t":277,"v":1448},{"t":278,"v":1448},{"t":279,"v":1447},{"t":280,"v":1447},{"t":281,"v":1447},{"t":282,"v":1447},{"t":283,"v":1447},{"t":284,"v":1446},{"t":285,"v":1446},{"t":286,"v":1446},{"t":287,"v":1445},{"t":288,"v":1445},{"t":289,"v":1445},{"t":290,"v":1445},{"t":291,"v":1444},{"t":292,"v":1444},{"t":293,"v":1444},{"t":294,"v":1444},{"t":295,"v":1443},{"t":296,"v":1443},{"t":297,"v":1443},{"t":298,"v":1442},{"t":299,"v":1442},{"t":300,"v":1442},{"t":301,"v":1441},{"t":302,"v":1441},{"t":303,"v":1441},{"t":304,"v":1441},{"t":305,"v":1440},{"t":306,"v":1440},{"t":307,"v":1440},{"t":308,"v":1439},{"t":309,"v":1439},{"t":310,"v":1439},{"t":311,"v":1438},{"t":312,"v":1438},{"t":313,"v":1438},{"t":314,"v":1437},{"t":315,"v":1437},{"t":316,"v":1437},{"t":317,"v":1436},{"t":318,"v":1436},{"t":319,"v":1436},{"t":320,"v":1435},{"t":321,"v":1435},{"t":322,"v":1434},{"t":323,"v":1434},{"t":324,"v":1434},{"t":325,"v":1433},{"t":326,"v":1433},{"t":327,"v":1433},{"t":328,"v":1432},{"t":329,"v":1432},{"t":330,"v":1431},{"t":331,"v":1431},{"t":332,"v":1431},{"t":333,"v":1430},{"t":334,"v":1430},{"t":335,"v":1429},{"t":336,"v":1429},{"t":337,"v":1428},{"t":338,"v":1428},{"t":339,"v":1427},{"t":340,"v":1427},{"t":341,"v":1427},{"t":342,"v":1426},{"t":343,"v":1425},{"t":344,"v":1425},{"t":345,"v":1425},{"t":346,"v":1424},{"t":347,"v":1424},{"t":348,"v":1423},{"t":349,"v":1423},{"t":350,"v":1422},{"t":351,"v":1421},{"t":352,"v":1421},{"t":353,"v":1420},{"t":354,"v":1420},{"t":355,"v":1419},{"t":356,"v":1419},{"t":357,"v":1417},{"t":358,"v":1417},{"t":359,"v":1417},{"t":360,"v":1416},{"t":361,"v":1415},{"t":362,"v":1415},{"t":363,"v":1414},{"t":364,"v":1414},{"t":365,"v":1413},{"t":366,"v":1412},{"t":367,"v":1412},{"t":368,"v":1411},{"t":369,"v":1411},{"t":370,"v":1410},{"t":371,"v":1410},{"t":372,"v":1409},{"t":373,"v":1408},{"t":374,"v":1408},{"t":375,"v":1407},{"t":376,"v":1407},{"t":377,"v":1406},{"t":378,"v":1406},{"t":379,"v":1405},{"t":380,"v":1404},{"t":381,"v":1404},{"t":382,"v":1406},{"t":383,"v":1403},{"t":384,"v":1402},{"t":385,"v":1402},{"t":386,"v":1401},{"t":387,"v":1401},{"t":388,"v":1400},{"t":389,"v":1400},{"t":390,"v":1399},{"t":391,"v":1399},{"t":392,"v":1398},{"t":393,"v":1398},{"t":394,"v":1397},{"t":395,"v":1396},{"t":396,"v":1396},{"t":397,"v":1395},{"t":398,"v":1395},{"t":399,"v":1394},{"t":400,"v":1394},{"t":401,"v":1393},{"t":402,"v":1393},{"t":403,"v":1392},{"t":404,"v":1392},{"t":405,"v":1391},{"t":406,"v":1391},{"t":407,"v":1390},{"t":408,"v":1390},{"t":409,"v":1389},{"t":410,"v":1389},{"t":411,"v":1388},{"t":412,"v":1388},{"t":413,"v":1387},{"t":414,"v":1387},{"t":415,"v":1386},{"t":416,"v":1386},{"t":417,"v":1385},{"t":418,"v":1385},{"t":419,"v":1384},{"t":420,"v":1384},{"t":421,"v":1384},{"t":422,"v":1383},{"t":423,"v":1382}],"fanAdj":[{"t":383,"v":1422},{"t":384,"v":1424},{"t":385,"v":1423},{"t":386,"v":1422},{"t":387,"v":1422},{"t":388,"v":1421},{"t":389,"v":1421},{"t":390,"v":1420},{"t":391,"v":1420},{"t":392,"v":1419},{"t":393,"v":1419},{"t":394,"v":1418},{"t":395,"v":1417},{"t":396,"v":1417},{"t":397,"v":1417},{"t":398,"v":1422},{"t":399,"v":1423},{"t":400,"v":1422},{"t":401,"v":1421},{"t":402,"v":1421},{"t":403,"v":1420},{"t":404,"v":1420},{"t":405,"v":1419},{"t":406,"v":1419},{"t":407,"v":1418},{"t":408,"v":1418},{"t":409,"v":1417},{"t":410,"v":1417},{"t":411,"v":1416},{"t":412,"v":1416},{"t":413,"v":1415},{"t":414,"v":1415},{"t":415,"v":1414},{"t":416,"v":1414},{"t":417,"v":1413},{"t":418,"v":1413},{"t":419,"v":1412},{"t":420,"v":1412},{"t":421,"v":1411},{"t":422,"v":1411},{"t":423,"v":1410}],"fc":370,"fcEst":true,"drop":416.86055585525423}};
+</script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var COLS = NLRows.COLUMNS.map(function (c) { return Object.assign({}, c); });
+  try { var saved = JSON.parse(localStorage.getItem('nl-cols-v3') || 'null'); if (saved) COLS.forEach(function (c) { if (c.key in saved) c.on = saved[c.key]; }); } catch (e) {}
+  var colorSeq = 0, rows = [Object.assign({ _sample: true, _ci: colorSeq++ }, SAMPLE)];
+  var pdfReady = false;
+
+  function status(msg, err) { var s = $('status'); s.textContent = msg; s.className = 'status' + (err ? ' err' : ''); }
+
+  // ---------- pdf.js ----------
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfReady = true; status('準備好了。下方是以 log0504 為例的結果，丟入你的 PDF 會取代它。');
+  } catch (e) { status('PDF 解析器載入失敗，請重新整理頁面再試。', true); }
+
+  function toImageData(img) {
+    if (img.data || !img.bitmap) return img;
+    var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img.bitmap, 0, 0);
+    var d = x.getImageData(0, 0, c.width, c.height); return { width: d.width, height: d.height, data: d.data };
+  }
+
+  async function handleFiles(list) {
+    var files = Array.prototype.filter.call(list, function (f) { return /\.pdf$/i.test(f.name) || f.type === 'application/pdf'; });
+    if (!files.length) { status('沒有找到 PDF 檔，請選擇 Studio 軟體匯出的 .pdf。', true); return; }
+    if (!pdfReady) { status('PDF 解析器還沒載入，請重新整理頁面。', true); return; }
+    rows = rows.filter(function (r) { return !r._sample; }); if (!rows.length) colorSeq = 0; var added = [];
+    var ok = 0, fail = [];
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i]; status('正在解析 ' + f.name + '（' + (i + 1) + '/' + files.length + '）…');
+      try {
+        var buf = new Uint8Array(await f.arrayBuffer());
+        var ex = await nlExtract(pdfjsLib, buf);
+        ex.images = ex.images.map(function (a) { return a.map(toImageData); });
+        var row = NLRows.build(f.name, ex, TEMPLATES);
+        if (!row.profile && row.drop === '—') throw new Error('不像 Link Studio 報告');
+        added.push(applyManual(row)); ok++;
+      } catch (e) { console.error(e); fail.push(f.name); }
+    }
+    added.sort(function (a, b) { return a.file.localeCompare(b.file, 'zh-Hant', { numeric: true }); });
+    added.forEach(function (r) { r._ci = colorSeq++; rows.push(r); });
+    status('完成：讀入 ' + ok + ' 份' + (fail.length ? '；無法解析：' + fail.join('、') + '（請確認是 Link Studio 或 Kaffelogic Studio 匯出的報告 PDF）' : '') + '。', fail.length && !ok);
+    renderTable(); renderImage();
+  }
+
+  var drop = $('drop'), input = $('file');
+  drop.addEventListener('click', function () { input.click(); });
+  drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', function () { handleFiles(input.files); input.value = ''; });
+  ['dragenter', 'dragover'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { handleFiles(e.dataTransfer.files); });
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('drop', function (e) { e.preventDefault(); if (!drop.contains(e.target)) handleFiles(e.dataTransfer.files); });
+
+  // ---------- column chips ----------
+  function renderCols() {
+    var box = $('cols'); box.innerHTML = '';
+    COLS.forEach(function (c) {
+      var l = document.createElement('label'); l.className = 'chip';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'col-' + c.key; cb.checked = c.on;
+      cb.addEventListener('change', function () { c.on = cb.checked; try { var m = {}; COLS.forEach(function (x) { m[x.key] = x.on; }); localStorage.setItem('nl-cols-v3', JSON.stringify(m)); } catch (e) {} renderTable(); renderImage(); });
+      l.appendChild(cb); l.appendChild(document.createTextNode(c.label)); box.appendChild(l);
+    });
+  }
+  function activeCols() { return COLS.filter(function (c) { return c.on; }); }
+
+  // ---------- editable table ----------
+  // ---------- manual fields ----------
+  var MANUAL_KEY = 'nl-manual';
+  function loadManual() { try { return JSON.parse(localStorage.getItem(MANUAL_KEY) || '{}'); } catch (e) { return {}; } }
+  function saveManual(row) {
+    if (row._sample) return;
+    try { var all = loadManual(), m = {}; COLS.forEach(function (c) { if (c.manual && row[c.key]) m[c.key] = row[c.key]; }); all[row.file] = m; localStorage.setItem(MANUAL_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function applyManual(row) { var m = loadManual()[row.file]; if (m) Object.keys(m).forEach(function (k) { if (m[k]) row[k] = String(m[k]).replace(/ \/ (?=[\d.]+°C)/, '\n'); }); return row; }
+  function fmtStep(q) { q = Math.round(q * 1000) / 1000; return (q > 0 ? '+' : q < 0 ? '−' : '') + Math.abs(q).toFixed(3); }
+  function num(v) { if (v == null || v === '') return null; var x = parseFloat(String(v).replace(/[^\d.\-]/g, '')); return isFinite(x) ? x : null; }
+  function normalize(c, v) {
+    v = String(v || '').trim(); if (!v) return '';
+    if (c.manual === 'num') { var x = num(v); return x == null ? v : x.toFixed(1); }
+    if (c.manual === 'pct') { var ns = v.match(/\d+(?:\.\d+)?/g); if (!ns) return v; return ns.slice(0, 2).join('-') + '%'; }
+    if (c.manual === 'event') {
+      var tm = v.match(/(\d{1,2})[:：.](\d{2})/), rest = tm ? v.replace(tm[0], ' ') : v, tp = rest.match(/\d+(?:\.\d+)?/);
+      if (!tm && !tp) return v;
+      return [tm ? (+tm[1]) + ':' + tm[2] : '', tp ? (+tp[0]).toFixed(1) + '°C' : ''].filter(Boolean).join('\n');
+    }
+    return v;
+  }
+  // powder minus whole bean, e.g. 豆 62.4 / 細粉 79.8 -> 17.4
+  function diffOf(row, c) { var b = num(row.agBean), o = num(row[c.key]); return b != null && o != null ? (o - b).toFixed(1) : ''; }
+  var PH = { event: '時間 溫度', num: '0.0', pct: '例：10-12', text: '' };
+  function cellText(row, c, forImage) {
+    var v = row[c.key] || '';
+    if (c.diff) { var d = diffOf(row, c); if (forImage) return v ? v + (d ? '\n' + c.diff + ' ' + d : '') : '—'; return v; }
+    return forImage && !v && c.manual ? '—' : v;
+  }
+
+  // ---------- editable table ----------
+  function renderTable() {
+    var t = $('tbl'), cols = activeCols(); t.innerHTML = '';
+    var thead = t.createTHead().insertRow();
+    cols.forEach(function (c) { var th = document.createElement('th'); th.textContent = c.label; if (c.manual) th.title = '手動輸入'; thead.appendChild(th); });
+    thead.appendChild(document.createElement('th'));
+    var tb = t.createTBody();
+    if (!rows.length) { var r0 = tb.insertRow(), td0 = r0.insertCell(); td0.colSpan = cols.length + 1; td0.style.fontFamily = 'var(--font-ui)'; td0.style.color = 'var(--muted)'; td0.textContent = '還沒有資料。把 PDF 拖到上方即可加入。'; return; }
+    rows.forEach(function (row, ri) {
+      var tr = tb.insertRow(), diffs = []; if (row._sample) tr.className = 'sample';
+      function refreshDiffs() { diffs.forEach(function (p) { var d = diffOf(row, p[1]); p[0].textContent = d ? p[1].diff + ' ' + d : ''; }); }
+      cols.forEach(function (c, ci) {
+        var td = tr.insertCell(); td.spellcheck = false;
+        if (c.manual === 'select') {
+          td.className = 'manual sel';
+          var sel = document.createElement('select'); sel.id = 'sel-' + c.key + '-' + ri; sel.setAttribute('aria-label', c.label);
+          [''].concat(c.options).forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o || '—'; sel.appendChild(op); });
+          sel.value = row[c.key] || '';
+          sel.addEventListener('change', function () { row[c.key] = sel.value; saveManual(row); scheduleImage(); });
+          td.appendChild(sel); return;
+        }
+        if (c.manual === 'step') {
+          td.className = 'manual stepper';
+          var dec = document.createElement('button'), inc = document.createElement('button'), inp = document.createElement('input');
+          dec.type = inc.type = 'button'; dec.textContent = '−'; inc.textContent = '+'; dec.setAttribute('aria-label', c.label + ' 減 ' + c.step); inc.setAttribute('aria-label', c.label + ' 加 ' + c.step);
+          inp.type = 'number'; inp.step = String(c.step); inp.inputMode = 'decimal'; inp.placeholder = '0.000'; inp.id = 'step-' + c.key + '-' + ri; inp.setAttribute('aria-label', c.label);
+          inp.value = row[c.key] ? String(parseFloat(row[c.key])) : '';
+          function commit(v) { if (v === '' || v == null || !isFinite(v)) { row[c.key] = ''; inp.value = ''; } else { var q = Math.round(v / c.step) * c.step; row[c.key] = fmtStep(q); inp.value = q.toFixed(3); } saveManual(row); scheduleImage(); }
+          inp.addEventListener('change', function () { commit(inp.value === '' ? '' : parseFloat(inp.value)); });
+          dec.addEventListener('click', function () { commit((parseFloat(inp.value) || 0) - c.step); });
+          inc.addEventListener('click', function () { commit((parseFloat(inp.value) || 0) + c.step); });
+          if (inp.value) inp.value = parseFloat(inp.value).toFixed(3);
+          td.appendChild(dec); td.appendChild(inp); td.appendChild(inc); return;
+        }
+        var ed = td;
+        if (c.diff) { ed = document.createElement('div'); td.appendChild(ed); var dv = document.createElement('div'); dv.className = 'diff'; td.appendChild(dv); diffs.push([dv, c]); }
+        ed.contentEditable = 'true'; ed.textContent = row[c.key] || '';
+        if (c.manual) { td.classList.add('manual'); ed.classList.add('ed'); ed.dataset.ph = PH[c.manual]; if (c.manual === 'num' || c.manual === 'pct') ed.inputMode = 'decimal'; }
+        if (row._sample && ci === 1) { var tag = document.createElement('span'); tag.className = 'tag'; tag.contentEditable = 'false'; tag.textContent = '範例'; ed.appendChild(tag); }
+        ed.addEventListener('input', function () {
+          var clone = ed.cloneNode(true); clone.querySelectorAll('.tag').forEach(function (n) { n.remove(); }); row[c.key] = clone.innerText.replace(/\n+$/, '');
+          refreshDiffs(); scheduleImage();
+        });
+        if (c.manual) {
+          ed.addEventListener('keydown', function (e) { if (e.key === 'Enter' && c.manual !== 'text') { e.preventDefault(); ed.blur(); } });
+          ed.addEventListener('blur', function () { var v = normalize(c, row[c.key]); row[c.key] = v; if (ed.textContent !== v) ed.textContent = v; refreshDiffs(); saveManual(row); scheduleImage(); });
+        }
+      });
+      refreshDiffs();
+      var act = tr.insertCell(); act.className = 'act';
+      var del = document.createElement('button'); del.type = 'button'; del.title = '移除這一列'; del.setAttribute('aria-label', '移除這一列'); del.textContent = '✕';
+      del.addEventListener('click', function () { rows.splice(ri, 1); renderTable(); renderImage(); });
+      function mv(d) { var j = ri + d; if (j < 0 || j >= rows.length) return; var t = rows[ri]; rows[ri] = rows[j]; rows[j] = t; renderTable(); renderImage(); }
+      var up = document.createElement('button'), dn = document.createElement('button');
+      up.type = dn.type = 'button'; up.textContent = '↑'; dn.textContent = '↓'; up.title = '上移'; dn.title = '下移';
+      up.setAttribute('aria-label', '上移這一列'); dn.setAttribute('aria-label', '下移這一列');
+      up.disabled = ri === 0; dn.disabled = ri === rows.length - 1;
+      up.addEventListener('click', function () { mv(-1); }); dn.addEventListener('click', function () { mv(1); });
+      act.appendChild(up); act.appendChild(dn); act.appendChild(del);
+    });
+  }
+  var imgTimer = null;
+  function scheduleImage() { clearTimeout(imgTimer); imgTimer = setTimeout(renderImage, 250); }
+
+  // ---------- PNG rendering ----------
+  var lastBlob = null;
+  function wrapLines(ctx, text, maxW) {
+    var out = [];
+    String(text || '').split('\n').forEach(function (para) {
+      var line = '';
+      Array.from(para).forEach(function (ch) {
+        if (ctx.measureText(line + ch).width > maxW && line) { out.push(line); line = ch; } else line += ch;
+      });
+      out.push(line);
+    });
+    return out;
+  }
+  function renderImage() {
+    try { renderCompare(); } catch (e) { console.error(e); }
+    var cols = activeCols(), data = rows;
+    // empty table: show a note instead of an image and turn the table downloads off
+    var empty = !data.length || !cols.length;
+    $('out').hidden = empty; $('out-empty').hidden = !empty;
+    $('save').disabled = empty; $('combo-save').disabled = empty; $('combo-save2').disabled = empty; $('cmp-save').disabled = !data.length;
+    if (empty) { lastBlob = null; var o = $('out').src; if (o && o.indexOf('blob:') === 0) URL.revokeObjectURL(o); $('out').removeAttribute('src'); return; }
+    var S = 2, pad = 14, lh = 21, FONT = '"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif', NUM = '"JetBrains Mono",' + FONT;
+    var cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+    var bodyFont = '14px ' + NUM, headFont = '700 13px ' + FONT;
+    // column widths
+    var widths = cols.map(function (c) {
+      ctx.font = headFont; var w = ctx.measureText(c.label).width;
+      ctx.font = bodyFont;
+      data.forEach(function (r) { String(cellText(r, c, true)).split('\n').forEach(function (l) { w = Math.max(w, ctx.measureText(l).width); }); });
+      return Math.min(Math.max(Math.ceil(w), 56), 240) + pad * 2;
+    });
+    var tableW = widths.reduce(function (a, b) { return a + b; }, 0), margin = 28;
+    ctx.font = bodyFont;
+    var rowLines = data.map(function (r) { return cols.map(function (c, i) { return wrapLines(ctx, cellText(r, c, true), widths[i] - pad * 2); }); });
+    var rowH = rowLines.map(function (cells) { return Math.max.apply(null, cells.map(function (l) { return l.length; }).concat([1])) * lh + pad * 1.4; });
+    var caption = fullCaption(), capH = caption ? 46 : 0, headH = 40, footH = 30;
+    var W = Math.max(tableW + margin * 2, 360), H = margin + capH + headH + rowH.reduce(function (a, b) { return a + b; }, 0) + footH + margin * 0.6;
+    cv.width = W * S; cv.height = H * S; ctx.scale(S, S);
+    // paper (image is always light so it reads anywhere it is shared)
+    ctx.fillStyle = '#fbfaf8'; ctx.fillRect(0, 0, W, H);
+    var x0 = margin, y = margin;
+    if (caption) { ctx.fillStyle = '#2a2320'; ctx.font = '700 20px ' + FONT; ctx.textBaseline = 'alphabetic'; ctx.fillText(caption, x0, y + 24); y += capH; }
+    // header
+    ctx.fillStyle = '#3b2a22'; roundRect(ctx, x0, y, tableW, headH, 8, true);
+    ctx.fillStyle = '#f6ece6'; ctx.font = headFont; ctx.textBaseline = 'middle';
+    var cx = x0; cols.forEach(function (c, i) { ctx.fillText(c.label, cx + pad, y + headH / 2); cx += widths[i]; });
+    y += headH;
+    // body
+    data.forEach(function (r, ri) {
+      var h = rowH[ri];
+      if (ri % 2 === 1) { ctx.fillStyle = '#f1ebe6'; ctx.fillRect(x0, y, tableW, h); }
+      ctx.strokeStyle = '#e2d9d2'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y + h - .5); ctx.lineTo(x0 + tableW, y + h - .5); ctx.stroke();
+      cx = x0; ctx.textBaseline = 'top';
+      cols.forEach(function (c, i) {
+        rowLines[ri][i].forEach(function (line, li) {
+          var muted = /^\(.*\)$/.test(line) || line === '—';
+          ctx.font = (muted ? '12px ' + FONT : (c.key === 'file' || c.key === 'profile' ? '600 14px ' : '14px ') + NUM);
+          ctx.fillStyle = muted ? '#8c7d73' : (c.key === 'dtr' ? '#8a3b24' : '#2a2320');
+          ctx.fillText(line, cx + pad, y + pad * 0.7 + li * lh + (muted ? 2 : 0));
+        });
+        cx += widths[i];
+      });
+      y += h;
+    });
+    ctx.font = '11px ' + FONT; ctx.fillStyle = '#a39389'; ctx.textBaseline = 'middle';
+    ctx.fillText('資料來源：Link / Kaffelogic Studio 烘焙報告　·　（預期）＝未手動記錄，取機器預測值　·　AUC＝入豆至下豆、以入豆溫度為基準的豆溫曲線下面積　·　粉差＝粗粉焙度−豆焙度，細粉差＝細粉焙度−豆焙度', x0, y + footH / 2 + 4);
+    cv.toBlob(function (b) { if (!b) return; lastBlob = b; var url = URL.createObjectURL(b), img = $('out'); var old = img.src; img.src = url; if (old && old.indexOf('blob:') === 0) URL.revokeObjectURL(old); }, 'image/png');
+  }
+  function roundRect(ctx, x, y, w, h, r, fill) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); if (fill) ctx.fill(); }
+
+  function fullCaption() { return [$('capdate').value, $('caption').value.trim()].filter(Boolean).join('　'); }
+  (function () { var d = new Date(); $('capdate').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  $('caption').addEventListener('input', scheduleImage); $('capdate').addEventListener('input', scheduleImage);
+  $('clear').addEventListener('click', function () { rows = []; colorSeq = 0; renderTable(); renderImage(); status('表格已清空。'); });
+
+  // ---------- download ----------
+  // Inside Claude the page saves through the downloads capability; as a stand-alone page (e.g. GitHub Pages) it uses a normal browser download.
+  var downloads = null, inClaude = !!(window.claude && window.claude.use);
+  if (inClaude) claude.use('downloads').then(function (d) { downloads = d; if (!d) $('savehint').textContent = '這個檢視不支援直接下載：在圖片上按右鍵（手機長按）即可另存圖片。'; });
+  async function saveFile(name, blob) {
+    name = name.replace(/[\\/:*?"<>|]/g, '_');
+    if (downloads) {
+      try { await downloads.save({ filename: name, data: blob }); $('savehint').textContent = '已下載 ' + name; }
+      catch (e) { $('savehint').textContent = e && e.code === 'declined' ? '已取消下載。' : '無法下載，請再試一次。'; }
+      return;
+    }
+    if (inClaude) { $('savehint').textContent = '這個檢視不支援直接下載：在圖片上按右鍵（手機長按）即可另存圖片。'; return; }
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    $('savehint').textContent = '已下載 ' + name;
+  }
+  $('save').addEventListener('click', async function () {
+    if (!lastBlob) return;
+    await saveFile((fullCaption() || (rows.length === 1 ? rows[0].file : '烘焙紀錄')) + '_表格.png', lastBlob);
+  });
+
+  // ---------- curve comparison ----------
+  var align = 'charge', cmpBlob = null;
+  var LIGHT = { bg: '#fbfaf8', fg: '#2a2320', muted: '#76685f', line: '#e2d9d2', s: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'] };
+  function themeColors() {
+    var cs = getComputedStyle(document.documentElement), g = function (n) { return cs.getPropertyValue(n).trim(); };
+    return { bg: g('--panel'), fg: g('--fg'), muted: g('--muted'), line: g('--line'), s: [1, 2, 3, 4, 5, 6, 7, 8].map(function (i) { return g('--s' + i); }) };
+  }
+  function cmpRows() { return rows.filter(function (r) { return r._curves && r._curves.temp && r._curves.temp.length; }); }
+  function shiftOf(r) { var c = r._curves; return align === 'fc' ? (c.fc != null ? c.fc : null) : 0; }
+  // fixed units: 1 minute per column; 50 °C, 20 °C/min and 50 rpm per row.
+  // Every cell is square, and all three panels get the same number of rows (so the same height).
+  var UNIT = { temp: 50, ror: 20, fan: 50 };
+  function unitDomain(key, lo, hi, N) { var u = UNIT[key], a0 = key === 'ror' ? 0 : Math.floor(lo / u) * u; return [a0, a0 + N * u, u]; }
+  function layout(W, n) {
+    var L = W < 520 ? 40 : 56, Rm = W < 520 ? 64 : 92, top = 24, gap = 40, pwMax = W - L - Rm;
+    var sc = scales(cmpRows()), span = sc ? sc.t[1] - sc.t[0] : 540;
+    var N = 3;
+    if (sc) ['temp', 'ror', 'fan'].forEach(function (k) { var u = UNIT[k], a0 = k === 'ror' ? 0 : Math.floor(sc[k][0] / u) * u; N = Math.max(N, Math.ceil((sc[k][1] - a0) / u - 1e-9)); });
+    // square cells one minute wide; capped so the panels stay a sensible height on wide screens
+    var cell = Math.min(pwMax * 60 / span, 80), pw = cell * span / 60, ph = N * cell;
+    var nRows = cmpRows().length, itemW = W < 520 ? 150 : 210, perRow = Math.max(1, Math.floor(pw / itemW));
+    var legLines = function (extra) { return Math.ceil((nRows + extra) / perRow); };
+    var panels = [], y = top, axisH = 34;
+    [['temp', '豆溫 °C', 0], ['ror', 'ROR °C/min', 0], ['fan', '風扇轉速', 1]].forEach(function (p, i) {
+      var legH = i === 0 ? 0 : legLines(p[2]) * 17 + 4;
+      y += legH;
+      panels.push({ key: p[0], label: p[1], x: L + Math.round((pwMax - pw) / 2), y: y, w: pw, h: ph, legTop: y - legH - 18, legExtra: p[2] });
+      y += ph + axisH + 26;
+    });
+    return { panels: panels, H: y - 26 + 6, xStep: 60, rows: N, sc: sc, perRow: perRow, itemW: itemW };
+  }
+  function scales(list) {
+    var t0 = 1e9, t1 = -1e9, ext = { temp: [1e9, -1e9], ror: [0, -1e9], fan: [1e9, -1e9] };
+    list.forEach(function (r) {
+      var sh = shiftOf(r); if (sh == null) return; var c = r._curves;
+      t0 = Math.min(t0, -sh); t1 = Math.max(t1, c.drop - sh); if (c.fan.length) t1 = Math.max(t1, c.fan[c.fan.length - 1].t - sh);
+      c.temp.forEach(function (q) { ext.temp[0] = Math.min(ext.temp[0], q.v); ext.temp[1] = Math.max(ext.temp[1], q.v); });
+      c.ror.forEach(function (q) { ext.ror[1] = Math.max(ext.ror[1], q.v); });
+      c.fan.concat(c.fanAdj || []).forEach(function (q) { ext.fan[0] = Math.min(ext.fan[0], q.v); ext.fan[1] = Math.max(ext.fan[1], q.v); });
+    });
+    if (t0 > t1) return null;
+    t1 += 15; t0 = Math.floor(t0 / 60) * 60; t1 = t0 + Math.ceil((t1 - t0) / 60) * 60;
+    var tmp = [ext.temp[0], ext.temp[1]];
+    var ror = [0, Math.max(10, ext.ror[1])];
+    var fan = ext.fan[1] > ext.fan[0] ? [ext.fan[0] - 2, ext.fan[1] + 2] : [1300, 1500];
+    return { t: [t0, t1], temp: tmp, ror: ror, fan: fan };
+  }
+  function niceStep(span, target) { var raw = span / target, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p; }
+  var lastLayout = null;
+  function drawCompare(ctx, W, colors, forExport) {
+    var list = cmpRows(), lay = layout(W, list.length), sc = lay.sc, FONT = '"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif', NUM = '"JetBrains Mono",' + FONT;
+    ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, W, lay.H + (forExport.extra || 0));
+    ctx.save(); ctx.translate(0, forExport.offset || 0);
+    if (!sc) { ctx.fillStyle = colors.muted; ctx.font = '14px ' + FONT; ctx.fillText(list.length ? '這些檔案沒有一爆時間，無法以一爆對齊。' : '沒有可比較的曲線。載入 PDF 後會出現在這裡。', 20, 40); ctx.restore(); lastLayout = null; return lay.H; }
+    var tx = function (p, t) { return p.x + (t - sc.t[0]) / (sc.t[1] - sc.t[0]) * p.w; };
+    lay.panels.forEach(function (p, pi) {
+      var sd = unitDomain(p.key, sc[p.key][0], sc[p.key][1], lay.rows), dom = [sd[0], sd[1]], ty = function (v) { return p.y + p.h - (v - dom[0]) / (dom[1] - dom[0]) * p.h; };
+      p.ty = ty; p.dom = dom;
+      // grid + y ticks: N equal rows, as tall as the columns are wide
+      ctx.strokeStyle = colors.line; ctx.lineWidth = 1; ctx.fillStyle = colors.muted; ctx.font = '11px ' + NUM; ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+      var st = sd[2];
+      for (var v = dom[0]; v <= dom[1] + st * 1e-6; v += st) { var y = Math.round(ty(v)) + .5; ctx.beginPath(); ctx.moveTo(p.x, y); ctx.lineTo(p.x + p.w, y); ctx.stroke(); ctx.fillText(String(Math.round(v)), p.x - 8, y); }
+      ctx.textAlign = 'left'; ctx.font = '600 12px ' + FONT; ctx.fillStyle = colors.fg; ctx.textBaseline = 'bottom'; ctx.fillText(p.label, p.x, p.y - 4);
+      // x ticks (only under the last panel, gridlines in all)
+      var xs = lay.xStep; for (var t = Math.ceil(sc.t[0] / xs) * xs; t <= sc.t[1] + 1e-6; t += xs) { var x = Math.round(tx(p, t)) + .5; ctx.strokeStyle = colors.line; ctx.beginPath(); ctx.moveTo(x, p.y); ctx.lineTo(x, p.y + p.h); ctx.stroke(); if (t % 60 === 0) { ctx.fillStyle = colors.muted; ctx.font = '11px ' + NUM; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText((t < 0 ? '−' : '') + NLCore.fmt(Math.abs(t)), x, p.y + p.h + 6); } }
+      if (align === 'fc') { var x0 = Math.round(tx(p, 0)) + .5; ctx.strokeStyle = colors.muted; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x0, p.y); ctx.lineTo(x0, p.y + p.h); ctx.stroke(); }
+      // series
+      ctx.save(); ctx.beginPath(); ctx.rect(p.x, p.y - 2, p.w, p.h + 4); ctx.clip();
+      // fan: the lighter-blue line in the report (curve with fan steps applied) in a lighter tint of the file's colour
+      if (p.key === 'fan') list.forEach(function (r) {
+        var sh = shiftOf(r), a = r._curves.fanAdj || []; if (sh == null || !a.length) return;
+        ctx.save(); ctx.globalAlpha = 0.5; ctx.strokeStyle = colors.s[r._ci % 8]; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
+        var base = r._curves.fan, last = base.length ? base[base.length - 1].t : 0;
+        function baseAt(t) { var b = null; base.forEach(function (q) { if (b == null || Math.abs(q.t - t) < Math.abs(b.t - t)) b = q; }); return b && Math.abs(b.t - t) <= 4 ? b.v : null; }
+        // split into contiguous runs; each run is joined to the dark line with a vertical step at both ends, as in the report
+        var segs = [], cur = null;
+        a.forEach(function (q, k) { if (!cur || q.t - a[k - 1].t > 3) { cur = []; segs.push(cur); } cur.push(q); });
+        segs.forEach(function (sg) {
+          var first = sg[0], lastQ = sg[sg.length - 1], b0 = baseAt(first.t), b1 = baseAt(lastQ.t);
+          ctx.moveTo(tx(p, first.t - sh), ty(first.t > 1 && b0 != null ? b0 : first.v));
+          sg.forEach(function (q) { ctx.lineTo(tx(p, q.t - sh), ty(q.v)); });
+          if (b1 != null && lastQ.t < last - 2) ctx.lineTo(tx(p, lastQ.t - sh), ty(b1));
+        });
+        ctx.stroke(); ctx.restore();
+      });
+      list.forEach(function (r, ri) {
+        var sh = shiftOf(r); if (sh == null) return; var data = r._curves[p.key]; if (!data.length) return;
+        ctx.strokeStyle = colors.s[r._ci % 8]; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
+        data.forEach(function (q, k) { var X = tx(p, q.t - sh), Y = ty(q.v); k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke(); ctx.setLineDash([]);
+      });
+      ctx.restore();
+      if (p.key === 'temp') list.forEach(function (r, ri) {
+        var sh = shiftOf(r); if (sh == null) return; var c = r._curves, col = colors.s[r._ci % 8];
+        function valAt(t) { var a = c.temp, best = a[0]; a.forEach(function (q) { if (Math.abs(q.t - t) < Math.abs(best.t - t)) best = q; }); return best.v; }
+        if (c.fc != null) { var X = tx(p, c.fc - sh), Y = ty(valAt(c.fc)); ctx.beginPath(); ctx.arc(X, Y, 5, 0, 7); ctx.fillStyle = colors.bg; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = col; if (c.fcEst) ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]); }
+        var Xd = tx(p, c.drop - sh), Yd = ty(valAt(c.drop - 1)); ctx.beginPath(); ctx.arc(Xd, Yd, 5, 0, 7); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = colors.bg; ctx.stroke();
+        if (list.length <= 4) { ctx.fillStyle = colors.fg; ctx.font = '600 12px ' + NUM; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(r.file, Xd + 10, Yd + (ri - (list.length - 1) / 2) * 14); }
+      });
+    });
+    lay.panels.forEach(function (xt) { ctx.fillStyle = colors.muted; ctx.font = '11px ' + FONT; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText('時間（分:秒）', xt.x + xt.w, xt.y + xt.h + 20); });
+    // legends for the ROR and fan panels
+    lay.panels.forEach(function (p, pi) {
+      if (pi === 0) return;
+      var items = list.map(function (r) { return { col: colors.s[r._ci % 8], text: r.file + (r.profile ? ' · ' + r.profile : ''), alpha: 1 }; });
+      if (p.legExtra) items.push({ col: colors.muted, text: '淺色線＝風扇調節後', alpha: 0.5 });
+      items.forEach(function (it, k) {
+        var x = p.x + (k % lay.perRow) * lay.itemW, y = p.legTop + Math.floor(k / lay.perRow) * 17;
+        ctx.save(); ctx.globalAlpha = it.alpha; ctx.fillStyle = it.col; ctx.fillRect(x, y + 6, 16, 3); ctx.restore();
+        ctx.fillStyle = colors.fg; ctx.font = (lay.itemW < 200 ? '11px ' : '12px ') + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        var tx2 = it.text; while (ctx.measureText(tx2).width > lay.itemW - 30 && tx2.length > 4) tx2 = tx2.slice(0, -2) + '…';
+        ctx.fillText(tx2, x + 22, y + 1);
+      });
+    });
+    ctx.restore();
+    lastLayout = { lay: lay, sc: sc, list: list, tx: tx };
+    return lay.H;
+  }
+  function renderLegend() {
+    var box = $('legend'), list = cmpRows(); box.innerHTML = '';
+    list.forEach(function (r, i) { var s = document.createElement('span'), sw = document.createElement('i'); sw.style.background = 'var(--s' + (r._ci % 8 + 1) + ')'; s.appendChild(sw); s.appendChild(document.createTextNode(r.file + (r.profile ? ' · ' + r.profile : '') + (align === 'fc' && r._curves.fc == null ? '（無一爆，未顯示）' : ''))); box.appendChild(s); });
+  }
+  function renderCompare() {
+    var cv = $('cmp'), W = cv.clientWidth || 800, dpr = window.devicePixelRatio || 1, ctx = cv.getContext('2d');
+    var H = layout(W, 0).H; cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawCompare(ctx, W, themeColors(), {}); renderLegend(); cmpBase = ctx.getImageData(0, 0, cv.width, cv.height);
+  }
+  var cmpBase = null;
+  function hover(ev) {
+    if (!lastLayout || !cmpBase) return;
+    var cv = $('cmp'), rect = cv.getBoundingClientRect(), mx = ev.clientX - rect.left, my = ev.clientY - rect.top, L = lastLayout, p0 = L.lay.panels[0];
+    if (mx < p0.x || mx > p0.x + p0.w) { leave(); return; }
+    var t = L.sc.t[0] + (mx - p0.x) / p0.w * (L.sc.t[1] - L.sc.t[0]), ctx = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
+    ctx.putImageData(cmpBase, 0, 0); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var col = themeColors(); ctx.strokeStyle = col.muted; ctx.lineWidth = 1;
+    L.lay.panels.forEach(function (p) { ctx.beginPath(); ctx.moveTo(mx + .5, p.y); ctx.lineTo(mx + .5, p.y + p.h); ctx.stroke(); });
+    var html = '<div class="tt">' + (t < 0 ? '−' : '') + NLCore.fmt(Math.abs(t)) + (align === 'fc' ? '（相對一爆）' : '') + '</div>';
+    L.list.forEach(function (r, ri) {
+      var sh = shiftOf(r); if (sh == null) return; var c = r._curves, tt = t + sh;
+      function v(a, digits) { if (!a.length || tt < a[0].t - 2 || tt > a[a.length - 1].t + 2) return '—'; var b = a[0]; a.forEach(function (q) { if (Math.abs(q.t - tt) < Math.abs(b.t - tt)) b = q; }); return b.v.toFixed(digits); }
+      var tv = v(c.temp, 1);
+      if (tv !== '—') { var p = L.lay.panels[0], Y = p.ty(+tv); ctx.beginPath(); ctx.arc(mx, Y, 4, 0, 7); ctx.fillStyle = col.s[r._ci % 8]; ctx.fill(); ctx.strokeStyle = col.bg; ctx.lineWidth = 2; ctx.stroke(); }
+      // adjusted fan value only where the adjusted curve actually exists at this moment (it has gaps)
+      var fa = '—'; if (c.fanAdj && c.fanAdj.length) { var nb = null; c.fanAdj.forEach(function (q) { if (nb == null || Math.abs(q.t - tt) < Math.abs(nb.t - tt)) nb = q; }); if (nb && Math.abs(nb.t - tt) <= 1.5) fa = nb.v.toFixed(0); }
+      html += '<div class="r"><i style="background:var(--s' + (r._ci % 8 + 1) + ')"></i>' + r.file + '　<b>' + tv + '</b>°C　ROR <b>' + v(c.ror, 1) + '</b>　風扇 <b>' + v(c.fan, 0) + '</b>' + (fa !== '—' ? '（調節後 ' + fa + '）' : '') + '</div>';
+    });
+    var tip = $('tip'); tip.innerHTML = html; tip.hidden = false;
+    var bw = $('cmp-box').clientWidth, tw = tip.offsetWidth, left = mx + 28 + 12 + tw > bw ? mx + 12 - tw - 16 : mx + 12 + 16;
+    tip.style.left = Math.max(4, left) + 'px'; tip.style.top = Math.max(4, my + 40) + 'px';
+  }
+  function leave() { $('tip').hidden = true; if (cmpBase) { var ctx = $('cmp').getContext('2d'); ctx.putImageData(cmpBase, 0, 0); } }
+  $('cmp').addEventListener('mousemove', hover); $('cmp').addEventListener('mouseleave', leave);
+  $('cmp').addEventListener('touchmove', function (e) { if (e.touches[0]) hover(e.touches[0]); }, { passive: true });
+  $('cmp').addEventListener('touchend', leave);
+  var rzT = null; window.addEventListener('resize', function () { clearTimeout(rzT); rzT = setTimeout(renderCompare, 150); });
+  if (window.matchMedia) try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderCompare); } catch (e) {}
+  new MutationObserver(renderCompare).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  function exportCompare(opts) {
+    opts = opts || {};
+    var W = opts.width || 1100, S = 2, list = cmpRows(), FONT = '"Noto Sans TC","PingFang TC",sans-serif', legendH = 22 + Math.ceil(list.length / 3) * 20, cap = opts.noCaption ? '' : fullCaption(), capH = cap ? 34 : 0, top = 24 + capH + legendH;
+    var H = layout(W, 0).H + top + 34, cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = W * S; cv.height = H * S; ctx.scale(S, S);
+    ctx.fillStyle = LIGHT.bg; ctx.fillRect(0, 0, W, H);
+    drawCompare(ctx, W, LIGHT, { offset: top, extra: top + 34 });
+    if (cap) { ctx.fillStyle = LIGHT.fg; ctx.font = '700 18px ' + FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(cap, 56, 18); }
+    list.forEach(function (r, i) { var x = 56 + (i % 3) * 340, y = 22 + capH + Math.floor(i / 3) * 20; ctx.fillStyle = LIGHT.s[r._ci % 8]; ctx.fillRect(x, y + 6, 18, 3); ctx.fillStyle = LIGHT.fg; ctx.font = '13px ' + FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(r.file + (r.profile ? ' · ' + r.profile : ''), x + 26, y); });
+    ctx.fillStyle = LIGHT.muted; ctx.font = '11px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText('空心圓＝一爆（虛線＝預期值）　實心圓＝下豆　·　曲線數值由 Studio 報告圖表判讀', 56, H - 10);
+    return new Promise(function (res) { cv.toBlob(res, 'image/png'); });
+  }
+  // table image on top, comparison chart below, one PNG
+  async function exportCombined() {
+    renderImage();
+    var tBlob = await new Promise(function (res) { var n = 0; (function wait() { if (lastBlob && n > 2) return res(lastBlob); n++; setTimeout(wait, 60); })(); });
+    var tImg = await createImageBitmap(tBlob), S = 2;
+    var cBlob = await exportCompare({ noCaption: true, width: 1100 }), cImg = await createImageBitmap(cBlob);
+    var W = Math.max(tImg.width, cImg.width), gap = 16 * S, H = tImg.height + gap + cImg.height;
+    var cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = W; cv.height = H;
+    ctx.fillStyle = LIGHT.bg; ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(tImg, 0, 0);
+    ctx.strokeStyle = LIGHT.line; ctx.lineWidth = S; ctx.beginPath(); ctx.moveTo(28 * S, tImg.height + gap / 2); ctx.lineTo(W - 28 * S, tImg.height + gap / 2); ctx.stroke();
+    ctx.drawImage(cImg, Math.round((W - cImg.width) / 2), tImg.height + gap);
+    return new Promise(function (res) { cv.toBlob(res, 'image/png'); });
+  }
+  async function saveCombined() {
+    if (!rows.length) { $('savehint').textContent = '表格是空的，先載入 PDF。'; return; }
+    await saveFile((fullCaption() || '烘焙紀錄') + '_表格及曲線.png', await exportCombined());
+  }
+  $('combo-save').addEventListener('click', saveCombined);
+  $('combo-save2').addEventListener('click', saveCombined);
+  $('cmp-save').addEventListener('click', async function () {
+    await saveFile((fullCaption() || '烘焙紀錄') + '_曲線.png', await exportCompare());
+  });
+
+  renderCols(); renderTable();
+  (document.fonts && document.fonts.ready ? Promise.race([document.fonts.load('14px "JetBrains Mono"'), new Promise(function (r) { setTimeout(r, 1500); })]).then(function () { return document.fonts.load('700 13px "Noto Sans TC"', '表格曲線'); }).catch(function () {}) : Promise.resolve()).then(renderImage, renderImage);
+})();
+</script>
+
+</body>
+</html>

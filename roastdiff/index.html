@@ -61,6 +61,9 @@ section h2 { font-size: .8rem; letter-spacing: .12em; color: var(--muted); margi
 label.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--chip); cursor: pointer; user-select: none; font-size: .92rem; }
 label.chip input { accent-color: var(--accent); margin: 0; }
 .row-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px; }
+.capbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; }
+.capbar input { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
+.capbar input[type=text] { width: min(100%, 300px); }
 .capbox { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; flex: 1 1 auto; }
 .capbox .btn { padding: 6px 14px; }
 .row-head input[type=date] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
@@ -121,6 +124,7 @@ button.btn:disabled { opacity: .5; cursor: default; }
     <p>拖入 Nucleus Link 或 Kaffelogic Nano 7（Studio 軟體）匯出的烘焙報告 PDF（可一次多份，兩種機型可混用），自動讀出曲線、風扇、爆點、DTR、入豆溫度與曲線下面積（AUC），產生可下載的表格圖片。所有解析都在你的瀏覽器內完成。</p>
   </header>
 
+  <div class="capbar"><input type="date" id="capdate" aria-label="日期"><input type="text" id="caption" aria-label="標題" placeholder="標題 (選填)，例如：衣索比亞 瑰夏村"></div>
   <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇 PDF 檔案">
     <strong>拖曳 PDF 到這裡，或點一下選擇檔案</strong>
     <small>支援 Link Studio 與 Kaffelogic Studio 的報告格式，繁體中文、簡體中文或英文介面皆可</small>
@@ -136,7 +140,7 @@ button.btn:disabled { opacity: .5; cursor: default; }
   <section>
     <div class="row-head">
       <h2 style="margin:0">表格內容</h2>
-      <div class="capbox"><input type="date" id="capdate" aria-label="日期"><input type="text" id="caption" placeholder="標題 (選填)，例如：衣索比亞 瑰夏村"><button class="btn" id="clear" type="button">清空表格</button></div>
+      <div class="capbox"><button class="btn" id="clear" type="button">清空表格</button></div>
     </div>
     <div class="tablebox" style="margin-top:8px"><table id="tbl"></table></div>
     <p class="hint">淡色底的欄位是手動輸入：風門策略用下拉選單選 A–D；風量設定用 − / + 每次調 0.005（也可以直接輸入，會自動對齊到 0.005 的倍數）；建議DTR 填範圍（例如 10-12，會顯示 10-12%）；第一聲、實際一爆填「時間 溫度」（例如 6:40 203，會分成兩行顯示；報告有記錄一爆時會自動帶入實際一爆）；烘後重與各焙度填數字（自動取到小數一位）。粉差＝粗粉焙度 − 豆焙度，細粉差＝細粉焙度 − 豆焙度，填了豆焙度才會算。手動填的值會記在這台瀏覽器，下次載入同一個檔案會自動帶入。每列右側的 ↑ ↓ 可以調整順序。</p>
@@ -162,7 +166,6 @@ button.btn:disabled { opacity: .5; cursor: default; }
       </div>
     </div>
     <div class="cmp-box" id="cmp-box">
-      <div class="legend" id="legend"></div>
       <canvas id="cmp" height="560" aria-label="豆溫、ROR、風扇轉速曲線比較圖"></canvas>
       <div class="tip" id="tip" hidden></div>
     </div>
@@ -605,7 +608,7 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var COLS = NLRows.COLUMNS.map(function (c) { return Object.assign({}, c); });
-  try { var saved = JSON.parse(localStorage.getItem('nl-cols-v3') || 'null'); if (saved) COLS.forEach(function (c) { if (c.key in saved) c.on = saved[c.key]; }); } catch (e) {}
+  try { var saved = JSON.parse(localStorage.getItem('nl-cols-v4') || 'null'); if (saved) COLS.forEach(function (c) { if (c.key in saved) c.on = saved[c.key]; }); } catch (e) {}
   var colorSeq = 0, rows = [Object.assign({ _sample: true, _ci: colorSeq++ }, SAMPLE)];
   var pdfReady = false;
 
@@ -663,7 +666,7 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
     COLS.forEach(function (c) {
       var l = document.createElement('label'); l.className = 'chip';
       var cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'col-' + c.key; cb.checked = c.on;
-      cb.addEventListener('change', function () { c.on = cb.checked; try { var m = {}; COLS.forEach(function (x) { m[x.key] = x.on; }); localStorage.setItem('nl-cols-v3', JSON.stringify(m)); } catch (e) {} renderTable(); renderImage(); });
+      cb.addEventListener('change', function () { c.on = cb.checked; try { var m = {}; COLS.forEach(function (x) { m[x.key] = x.on; }); localStorage.setItem('nl-cols-v4', JSON.stringify(m)); } catch (e) {} renderTable(); renderImage(); });
       l.appendChild(cb); l.appendChild(document.createTextNode(c.label)); box.appendChild(l);
     });
   }
@@ -874,6 +877,13 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
   // Every cell is square, and all three panels get the same number of rows (so the same height).
   var UNIT = { temp: 50, ror: 20, fan: 50 };
   function unitDomain(key, lo, hi, N) { var u = UNIT[key], a0 = key === 'ror' ? 0 : Math.floor(lo / u) * u; return [a0, a0 + N * u, u]; }
+  var LEG_FONT = '13px "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif', LEG_LH = 21, legCtx = document.createElement('canvas').getContext('2d');
+  function legendTexts(list, extra) { var t = list.map(function (r) { return r.file + (r.profile ? ' · ' + r.profile : ''); }); if (extra) t.push('淺色線＝風扇調節後'); return t; }
+  function legendRowsFor(texts, maxW) {
+    legCtx.font = LEG_FONT; var rows = [[]], x = 0;
+    texts.forEach(function (t, k) { var w = 24 + legCtx.measureText(t).width; if (x > 0 && x + w > maxW) { rows.push([]); x = 0; } rows[rows.length - 1].push({ k: k, x: x }); x += w + 16; });
+    return texts.length ? rows : [];
+  }
   function layout(W, n) {
     var L = W < 520 ? 40 : 56, Rm = W < 520 ? 64 : 92, top = 24, gap = 40, pwMax = W - L - Rm;
     var sc = scales(cmpRows()), span = sc ? sc.t[1] - sc.t[0] : 540;
@@ -881,16 +891,17 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
     if (sc) ['temp', 'ror', 'fan'].forEach(function (k) { var u = UNIT[k], a0 = k === 'ror' ? 0 : Math.floor(sc[k][0] / u) * u; N = Math.max(N, Math.ceil((sc[k][1] - a0) / u - 1e-9)); });
     // square cells one minute wide; capped so the panels stay a sensible height on wide screens
     var cell = Math.min(pwMax * 60 / span, 80), pw = cell * span / 60, ph = N * cell;
-    var nRows = cmpRows().length, itemW = W < 520 ? 150 : 210, perRow = Math.max(1, Math.floor(pw / itemW));
-    var legLines = function (extra) { return Math.ceil((nRows + extra) / perRow); };
+    // legend above each panel, same look for all three: 18x3 swatch, 13px label, items flow and wrap
+    var legRows = function (extra) { return legendRowsFor(legendTexts(cmpRows(), extra), pw).length; };
     var panels = [], y = top, axisH = 34;
     [['temp', '豆溫 °C', 0], ['ror', 'ROR °C/min', 0], ['fan', '風扇轉速', 1]].forEach(function (p, i) {
-      var legH = i === 0 ? 0 : legLines(p[2]) * 17 + 4;
-      y += legH;
-      panels.push({ key: p[0], label: p[1], x: L + Math.round((pwMax - pw) / 2), y: y, w: pw, h: ph, legTop: y - legH - 18, legExtra: p[2] });
-      y += ph + axisH + 26;
+      var legH = legRows(p[2]) * LEG_LH;
+      var legTop = y;
+      y += legH + 24;
+      panels.push({ key: p[0], label: p[1], x: L + Math.round((pwMax - pw) / 2), y: y, w: pw, h: ph, legTop: legTop, legExtra: p[2] });
+      y += ph + axisH + 18;
     });
-    return { panels: panels, H: y - 26 + 6, xStep: 60, rows: N, sc: sc, perRow: perRow, itemW: itemW };
+    return { panels: panels, H: y - 18 + 6, xStep: 60, rows: N, sc: sc };
   }
   function scales(list) {
     var t0 = 1e9, t1 = -1e9, ext = { temp: [1e9, -1e9], ror: [0, -1e9], fan: [1e9, -1e9] };
@@ -961,17 +972,17 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
       });
     });
     lay.panels.forEach(function (xt) { ctx.fillStyle = colors.muted; ctx.font = '11px ' + FONT; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText('時間（分:秒）', xt.x + xt.w, xt.y + xt.h + 20); });
-    // legends for the ROR and fan panels
-    lay.panels.forEach(function (p, pi) {
-      if (pi === 0) return;
-      var items = list.map(function (r) { return { col: colors.s[r._ci % 8], text: r.file + (r.profile ? ' · ' + r.profile : ''), alpha: 1 }; });
-      if (p.legExtra) items.push({ col: colors.muted, text: '淺色線＝風扇調節後', alpha: 0.5 });
-      items.forEach(function (it, k) {
-        var x = p.x + (k % lay.perRow) * lay.itemW, y = p.legTop + Math.floor(k / lay.perRow) * 17;
-        ctx.save(); ctx.globalAlpha = it.alpha; ctx.fillStyle = it.col; ctx.fillRect(x, y + 6, 16, 3); ctx.restore();
-        ctx.fillStyle = colors.fg; ctx.font = (lay.itemW < 200 ? '11px ' : '12px ') + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-        var tx2 = it.text; while (ctx.measureText(tx2).width > lay.itemW - 30 && tx2.length > 4) tx2 = tx2.slice(0, -2) + '…';
-        ctx.fillText(tx2, x + 22, y + 1);
+    // legends (same format above every panel)
+    lay.panels.forEach(function (p) {
+      var texts = legendTexts(list, p.legExtra), rows = legendRowsFor(texts, p.w);
+      ctx.font = LEG_FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      rows.forEach(function (row, ri) {
+        row.forEach(function (it) {
+          var x = p.x + it.x, y = p.legTop + ri * LEG_LH + LEG_LH / 2, extra = it.k >= list.length;
+          ctx.save(); ctx.globalAlpha = extra ? 0.5 : 1; ctx.fillStyle = extra ? colors.muted : colors.s[list[it.k]._ci % 8];
+          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y - 1.5, 18, 3, 1.5); else ctx.rect(x, y - 1.5, 18, 3); ctx.fill(); ctx.restore();
+          ctx.fillStyle = colors.fg; ctx.font = LEG_FONT; ctx.fillText(texts[it.k], x + 24, y);
+        });
       });
     });
     ctx.restore();
@@ -985,10 +996,10 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
   function renderCompare() {
     var cv = $('cmp'), W = cv.clientWidth || 800, dpr = window.devicePixelRatio || 1, ctx = cv.getContext('2d');
     var H = layout(W, 0).H; cv.style.height = H + 'px'; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawCompare(ctx, W, themeColors(), {}); renderLegend(); cmpBase = ctx.getImageData(0, 0, cv.width, cv.height);
+    drawCompare(ctx, W, themeColors(), {}); cmpBase = ctx.getImageData(0, 0, cv.width, cv.height);
   }
   var cmpBase = null;
-  function hover(ev) {
+  function hover(ev, touch) {
     if (!lastLayout || !cmpBase) return;
     var cv = $('cmp'), rect = cv.getBoundingClientRect(), mx = ev.clientX - rect.left, my = ev.clientY - rect.top, L = lastLayout, p0 = L.lay.panels[0];
     if (mx < p0.x || mx > p0.x + p0.w) { leave(); return; }
@@ -1008,23 +1019,27 @@ var SAMPLE = {"_fileName":"log0504.pdf","file":"log0504","profile":"210.5 NCT (A
     });
     var tip = $('tip'); tip.innerHTML = html; tip.hidden = false;
     var bw = $('cmp-box').clientWidth, tw = tip.offsetWidth, left = mx + 28 + 12 + tw > bw ? mx + 12 - tw - 16 : mx + 12 + 16;
-    tip.style.left = Math.max(4, left) + 'px'; tip.style.top = Math.max(4, my + 40) + 'px';
+    tip.style.left = Math.max(4, left) + 'px';
+    // on touch the finger covers the area below and around the point: lift the box above it
+    var topPos = touch ? my + (cv.offsetTop || 0) - tip.offsetHeight - 70 : my + 40;
+    if (touch && topPos < 4) topPos = my + (cv.offsetTop || 0) + 80;
+    tip.style.top = Math.max(4, topPos) + 'px';
   }
   function leave() { $('tip').hidden = true; if (cmpBase) { var ctx = $('cmp').getContext('2d'); ctx.putImageData(cmpBase, 0, 0); } }
   $('cmp').addEventListener('mousemove', hover); $('cmp').addEventListener('mouseleave', leave);
-  $('cmp').addEventListener('touchmove', function (e) { if (e.touches[0]) hover(e.touches[0]); }, { passive: true });
+  $('cmp').addEventListener('touchstart', function (e) { if (e.touches[0]) hover(e.touches[0], true); }, { passive: true });
+  $('cmp').addEventListener('touchmove', function (e) { if (e.touches[0]) hover(e.touches[0], true); }, { passive: true });
   $('cmp').addEventListener('touchend', leave);
   var rzT = null; window.addEventListener('resize', function () { clearTimeout(rzT); rzT = setTimeout(renderCompare, 150); });
   if (window.matchMedia) try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderCompare); } catch (e) {}
   new MutationObserver(renderCompare).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   function exportCompare(opts) {
     opts = opts || {};
-    var W = opts.width || 1100, S = 2, list = cmpRows(), FONT = '"Noto Sans TC","PingFang TC",sans-serif', legendH = 22 + Math.ceil(list.length / 3) * 20, cap = opts.noCaption ? '' : fullCaption(), capH = cap ? 34 : 0, top = 24 + capH + legendH;
+    var W = opts.width || 1100, S = 2, list = cmpRows(), FONT = '"Noto Sans TC","PingFang TC",sans-serif', cap = opts.noCaption ? '' : fullCaption(), capH = cap ? 34 : 0, top = 16 + capH;
     var H = layout(W, 0).H + top + 34, cv = document.createElement('canvas'), ctx = cv.getContext('2d'); cv.width = W * S; cv.height = H * S; ctx.scale(S, S);
     ctx.fillStyle = LIGHT.bg; ctx.fillRect(0, 0, W, H);
     drawCompare(ctx, W, LIGHT, { offset: top, extra: top + 34 });
     if (cap) { ctx.fillStyle = LIGHT.fg; ctx.font = '700 18px ' + FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(cap, 56, 18); }
-    list.forEach(function (r, i) { var x = 56 + (i % 3) * 340, y = 22 + capH + Math.floor(i / 3) * 20; ctx.fillStyle = LIGHT.s[r._ci % 8]; ctx.fillRect(x, y + 6, 18, 3); ctx.fillStyle = LIGHT.fg; ctx.font = '13px ' + FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left'; ctx.fillText(r.file + (r.profile ? ' · ' + r.profile : ''), x + 26, y); });
     ctx.fillStyle = LIGHT.muted; ctx.font = '11px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText('空心圓＝一爆（虛線＝預期值）　實心圓＝下豆　·　曲線數值由 Studio 報告圖表判讀', 56, H - 10);
     return new Promise(function (res) { cv.toBlob(res, 'image/png'); });

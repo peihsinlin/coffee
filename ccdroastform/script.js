@@ -1,3 +1,8 @@
+/*!
+ * 烘豆小助手 Roasting Assistant
+ * Copyright (c) 2026 PEI-HSIN LIN
+ * Licensed under the MIT License. 以 MIT 授權條款釋出，詳見 LICENSE.txt。
+ */
 'use strict';
 
 var state = { planEvents: [], miniFireEvents: [], miniDamperEvents: [] };  // planEvents: {id, seconds, type, value}（SR540/SR800 專用）

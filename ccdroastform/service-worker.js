@@ -1,3 +1,8 @@
+/*!
+ * 烘豆小助手 Roasting Assistant
+ * Copyright (c) 2026 PEI-HSIN LIN
+ * Licensed under the MIT License. 以 MIT 授權條款釋出，詳見 LICENSE.txt。
+ */
 'use strict';
 // PWA 的離線快取／App殼快取。只快取「同網域」的請求，Google Fonts 等外部資源不攔截，交給瀏覽器自己處理。
 //

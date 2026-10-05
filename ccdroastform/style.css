@@ -1,3 +1,8 @@
+/*!
+ * 烘豆小助手 Roasting Assistant
+ * Copyright (c) 2026 PEI-HSIN LIN
+ * Licensed under the MIT License. 以 MIT 授權條款釋出，詳見 LICENSE.txt。
+ */
 :root{
   --espresso:#241712;
   --roast:#4A2F20;
@@ -95,6 +100,9 @@ button:focus-visible, input:focus-visible, select:focus-visible{
 .appbar__title{ display:block; font-family:var(--serif); font-weight:700; font-size:22px; color:var(--parchment); }
 .appbar__subtitle{ display:block; font-family:var(--sans); font-size:13px; color:var(--copper); margin-top:4px; }
 .app-footer-note{ display:block; text-align:center; font-family:var(--sans); font-size:11.5px; letter-spacing:.04em; color:var(--line); padding:10px 0 2px; }
+/* 頁尾兩行文字（品牌名稱、版權）靠近排列：去掉 <p> 預設上下間距，第二行不再另外加上方留白 */
+.app-footer-note{ margin:0; }
+.app-footer-note + .app-footer-note{ padding-top:0; }
 
 main{ flex:1; display:flex; flex-direction:column; gap:16px; }
 .screen{ display:flex; flex-direction:column; gap:16px; }

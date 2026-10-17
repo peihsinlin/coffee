@@ -404,6 +404,15 @@ document.addEventListener('DOMContentLoaded', function(){
     resumeAudioCtx();
     primeSpeech();
   }, true);
+  // 點擊烘豆畫面上的按鈕後，把 focus 拉回溫度輸入框，讓鍵盤保持開著（例如收起鍵盤後點任何按鈕就會再打開）；
+  // 點的是其他輸入欄位（例如調整面板的數值）時不搶 focus
+  document.getElementById('screen-roast').addEventListener('click', function(e){
+    if (!roast || document.getElementById('tempPrompt').hidden) return;
+    if (e.target.closest('input, select, textarea')) return;
+    var ae = document.activeElement;
+    if (ae && ae !== document.body && ae.matches('input, select, textarea') && ae.id !== 'tempPromptInput') return;
+    keepTempInputFocused();
+  });
 });
 
 // ---------- Wake Lock ----------
@@ -845,6 +854,7 @@ function showTempPrompt(auto, crackLabel){
   input.value = '';
   panel.hidden = false;
   panel.classList.add('capture-panel--active');
+  if (roast) roast.promptActive = true;
   // 記錄「彈出當下」的累計秒數，送出時一律用這個時間點，不用送出當下的時間，
   // 避免打字／猶豫太久導致實際記錄的時間點被延後
   if (roast) roast.pendingPromptElapsed = roast.elapsed;
@@ -867,6 +877,27 @@ function hideTempPrompt(){
   var panel = document.getElementById('tempPrompt');
   panel.hidden = true;
   panel.classList.remove('capture-panel--active');
+  if (roast) roast.promptActive = false;
+  document.getElementById('tempPromptInput').blur();
+}
+// 烘豆中溫度輸入框不關閉，改成「待機」狀態並保持 focus，讓手機鍵盤一直開著：
+// iPhone 只允許在使用者點擊當下叫出鍵盤，每 30 秒由計時器跳出的提示無法自己叫出鍵盤，
+// 所以讓鍵盤從開始烘豆起就常駐，提示一到就能直接輸入數字。
+// 待機時送出的溫度視為手動記溫，時間點用送出當下。
+function idleTempPrompt(){
+  var panel = document.getElementById('tempPrompt');
+  var input = document.getElementById('tempPromptInput');
+  document.getElementById('tempPromptLabel').textContent = '隨時可輸入溫度（記為手動記溫）';
+  input.value = '';
+  panel.hidden = false;
+  panel.classList.remove('capture-panel--active');
+  if (roast){ roast.promptActive = false; roast.pendingPromptElapsed = null; }
+  keepTempInputFocused();
+}
+function keepTempInputFocused(){
+  var input = document.getElementById('tempPromptInput');
+  if (document.activeElement === input) return;
+  try { input.focus({ preventScroll: true }); } catch (e){ input.focus(); }
 }
 
 // ---------- 風速／火力提醒的確認提示（時間到時除了語音提示外，需按確認才寫入紀錄；超過10秒沒動作則自動寫入） ----------
@@ -1451,7 +1482,7 @@ function tick(){
   if (onGridMark && roast.lastPromptAt !== dispElapsed){
     roast.lastPromptAt = dispElapsed;
     beep(1000, 220, 0.6);
-    if (document.getElementById('tempPrompt').hidden){
+    if (!roast.promptActive){
       roast.pendingCrackLabel = null;
       showTempPrompt(true);
     } else {
@@ -1745,6 +1776,8 @@ document.addEventListener('DOMContentLoaded', function(){
     }
 
     showScreen('roast');
+    // 在「開始烘豆」這次點擊裡就讓溫度輸入框取得 focus，iPhone 才會叫出鍵盤並在整個烘豆過程保持開著
+    idleTempPrompt();
     requestWakeLock();
     drawLiveCurve();
     timerInterval = setInterval(tick, 1000);
@@ -1822,7 +1855,7 @@ document.addEventListener('DOMContentLoaded', function(){
       var usedTpBtn = document.querySelector('.crack-btn[data-label="回溫點"]');
       if (usedTpBtn) usedTpBtn.disabled = true;
       roast.pendingCrackLabel = null;
-      hideTempPrompt();
+      idleTempPrompt();
       scheduleAnchoredDamperEvents('回溫點', tpT);
       drawLiveCurve();
       updateRorReadout();
@@ -1845,11 +1878,12 @@ document.addEventListener('DOMContentLoaded', function(){
       // Mini500：澎到最大／第一聲／一爆起／一爆止／二爆起／二爆止 也可能是風門提醒的錨定事件
       if (roast.machineName === 'Mini500') scheduleAnchoredDamperEvents(crackLabel, elapsed);
     }
-    hideTempPrompt();
     if (roast.pendingFinish){
       roast.pendingFinish = false;
+      hideTempPrompt();
       finishRoast();
     } else {
+      idleTempPrompt();
       drawLiveCurve();
       updateRorReadout();
       if (roast.pending30Mark){
@@ -1859,12 +1893,12 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   });
 
-  // 取消記錄溫度：不寫入任何紀錄，直接關閉輸入欄位；如果背後還排著一筆30秒自動提醒，跟送出時一樣接著補顯示
+  // 取消記錄溫度：不寫入任何紀錄，輸入框回到待機狀態（鍵盤保持開著）；如果背後還排著一筆30秒自動提醒，跟送出時一樣接著補顯示
   document.getElementById('btnTempPromptCancel').addEventListener('click', function(){
     if (!roast){ hideTempPrompt(); return; }
     roast.pendingCrackLabel = null;
     roast.pendingFinish = false;
-    hideTempPrompt();
+    idleTempPrompt();
     if (roast.pending30Mark){
       roast.pending30Mark = false;
       showTempPrompt(true);

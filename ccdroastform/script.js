@@ -466,6 +466,9 @@ function strokeSmoothPath(ctx, pts){
   ctx.stroke();
 }
 
+// 四捨五入到小數點一位（溫度可輸入一位小數，相減後要去掉浮點誤差，例如 0.30000000000000004）
+function round1(v){ return Math.round(v * 10) / 10; }
+
 // 計算 RoR（升溫速率，°C/分鐘），優先用60秒間隔，不足時用30秒間隔*2估算
 function computeRorSeries(tempLog){
   var out = [];
@@ -845,8 +848,10 @@ function showTempPrompt(auto, crackLabel){
   // 記錄「彈出當下」的累計秒數，送出時一律用這個時間點，不用送出當下的時間，
   // 避免打字／猶豫太久導致實際記錄的時間點被延後
   if (roast) roast.pendingPromptElapsed = roast.elapsed;
-  // 面板在畫面上的位置可能離目前捲動位置很遠（例如按下畫面最下方的「結束烘豆，查看結果」按鈕時，
-  // 面板其實在畫面中段、當下不在可視範圍內），iPhone 在輸入框還沒捲進畫面內時 focus 常常悄悄失敗，
+  // iPhone 只有在「使用者點擊」的同一個事件處理流程裡呼叫 focus() 才會跳出鍵盤，
+  // 所以先同步 focus 一次（手動記溫、爆點按鈕、結束烘豆等由點擊觸發的情況會直接跳出數字鍵盤）
+  input.focus();
+  // 面板在畫面上的位置可能離目前捲動位置很遠，iPhone 在輸入框還沒捲進畫面內時 focus 常常悄悄失敗，
   // 游標不會真的跳進欄位、鍵盤也不會跳出來，使用者完全看不出來要輸入溫度，因此先捲動讓面板進入畫面
   if (typeof panel.scrollIntoView === 'function') panel.scrollIntoView({ block: 'center', behavior: 'smooth' });
   // 用兩層 requestAnimationFrame 等捲動與版面都穩定後再 focus，
@@ -878,14 +883,41 @@ function renderConfirmPanel(){
   panel.hidden = false;
   panel.classList.add('capture-panel--active');
   list.innerHTML = roast.pendingConfirms.map(function(item, idx){
+    var sp = item.label.indexOf(' ');
     return '<div class="event-confirm-item">' +
-      '<span class="event-confirm-item__label">' + escapeHtml(item.label) + '（' + formatTime(item.t) + '）</span>' +
+      '<span class="event-confirm-item__label">' + escapeHtml(item.label.slice(0, sp)) + '（' + formatTime(item.t) + '）</span>' +
+      '<div class="event-confirm-adjust">' +
+        '<button type="button" data-action="minus" data-idx="' + idx + '" class="btn btn--outline btn--sm" aria-label="減少">－</button>' +
+        '<span class="event-confirm-value">' + escapeHtml(item.label.slice(sp + 1)) + '</span>' +
+        '<button type="button" data-action="plus" data-idx="' + idx + '" class="btn btn--outline btn--sm" aria-label="增加">＋</button>' +
+      '</div>' +
       '<div class="control-row">' +
         '<button type="button" data-action="cancel" data-idx="' + idx + '" class="btn btn--outline btn--sm">取消</button>' +
         '<button type="button" data-action="confirm" data-idx="' + idx + '" class="btn btn--primary btn--sm">確認寫入</button>' +
       '</div>' +
     '</div>';
   }).join('');
+}
+// 提醒確認的 10 秒自動寫入計時；按 +/- 調整數值時會重新起算，避免調到一半就被自動寫入
+function armConfirmTimer(pending){
+  clearTimeout(pending.timer);
+  pending.timer = setTimeout(function(){
+    var idx = roast.pendingConfirms.indexOf(pending);
+    if (idx !== -1) resolvePendingConfirm(idx, true);
+  }, 10000);
+}
+// 提醒確認時用 +/- 調整數值：風門依選項清單切換、Mini500 火力每次 0.1、其他（風速／SR 火力）1-9 整數
+function stepPendingConfirm(idx, delta){
+  if (!roast) return;
+  var item = roast.pendingConfirms[idx];
+  if (!item) return;
+  var sp = item.label.indexOf(' '), type = item.label.slice(0, sp), val = item.label.slice(sp + 1);
+  if (type === '風門') val = stepDamperValue(val, delta);
+  else if (type === '火力' && roast.machineName === 'Mini500') val = clampPowerDecimal((parseFloat(val) || 1) + 0.1 * delta).toFixed(1);
+  else val = String(clampAdjustValue((parseInt(val, 10) || 5) + delta));
+  item.label = type + ' ' + val;
+  armConfirmTimer(item);
+  renderConfirmPanel();
 }
 function resolvePendingConfirm(idx, write){
   if (!roast) return;
@@ -1008,8 +1040,9 @@ function updateRorReadout(){
   var p30 = findPointNear(roast.tempLog, latest.t - 30, 5);
   var p60 = findPointNear(roast.tempLog, latest.t - 60, 5);
   var parts = [];
-  parts.push(p30 ? ('30秒 ' + (latest.temp - p30.temp >= 0 ? '+' : '') + (latest.temp - p30.temp) + '°C') : '30秒 —');
-  parts.push(p60 ? ('60秒 ' + (latest.temp - p60.temp >= 0 ? '+' : '') + (latest.temp - p60.temp) + '°C') : '60秒 —');
+  function rise(p){ var d = round1(latest.temp - p.temp); return (d >= 0 ? '+' : '') + d + '°C'; }
+  parts.push(p30 ? ('30秒 ' + rise(p30)) : '30秒 —');
+  parts.push(p60 ? ('60秒 ' + rise(p60)) : '60秒 —');
   el.textContent = 'RoR（升溫速率）' + parts.join(' ／ ');
 }
 
@@ -1169,7 +1202,7 @@ function compute30sRow(cols, isCrackCol){
       if (diff < bestDiff){ bestDiff = diff; best = cols[k]; }
     }
     if (!best) return null;
-    return Math.round(p.temp - best.temp);
+    return round1(p.temp - best.temp);
   });
 }
 
@@ -1203,7 +1236,7 @@ function compute60sRow(cols, isCrackCol){
       if (diff < bestDiff){ bestDiff = diff; best = cols[k]; }
     }
     if (!best) return null;
-    return Math.round(p.temp - best.temp);
+    return round1(p.temp - best.temp);
   });
 }
 
@@ -1434,10 +1467,7 @@ function tick(){
       var nearestTemp = findNearestTemp(roast.tempLog, elapsed);
       // 時間到了先用語音／嗶聲提醒，實際是否寫入紀錄改由彈出的確認提示決定；若風速、火力同時到時間，會同時列在提示清單中
       var pending = { t: elapsed, label: ev.label, temp: nearestTemp, timer: null };
-      pending.timer = setTimeout(function(){
-        var idx = roast.pendingConfirms.indexOf(pending);
-        if (idx !== -1) resolvePendingConfirm(idx, true);
-      }, 10000);
+      armConfirmTimer(pending);
       roast.pendingConfirms.push(pending);
 
       if (ev.seconds === 0){
@@ -1756,6 +1786,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var input = document.getElementById('tempPromptInput');
     var val = parseFloat(input.value);
     if (isNaN(val)) return;
+    val = round1(val); // 溫度最多記到小數點一位
 
     // Mini500「回溫點」：畫面上的計時器歸零重新開始計算，但溫度紀錄與事件時間軸都不清空，
     // 回溫點本身的溫度會被記錄下來（接續在原本的紀錄之後）；設定頁「自訂操作提醒」裡的火力／風門
@@ -1844,7 +1875,9 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('eventConfirmList').addEventListener('click', function(e){
     var btn = e.target.closest('button[data-action]');
     if (!btn) return;
-    resolvePendingConfirm(parseInt(btn.dataset.idx, 10), btn.dataset.action === 'confirm');
+    var idx = parseInt(btn.dataset.idx, 10), action = btn.dataset.action;
+    if (action === 'minus' || action === 'plus') stepPendingConfirm(idx, action === 'plus' ? 1 : -1);
+    else resolvePendingConfirm(idx, action === 'confirm');
   });
 
   // 刪除新增錯誤的溫度紀錄（烘豆中的表格才有這一列刪除按鈕）
@@ -1986,7 +2019,6 @@ document.addEventListener('DOMContentLoaded', function(){
     roast.pendingFinish = true;
     showTempPrompt(false, '結束烘豆');
   }
-  document.getElementById('btnFinishRoast').addEventListener('click', requestFinishRoast);
   document.getElementById('btnEndRoastQuick').addEventListener('click', requestFinishRoast);
 
   // 輸入烘後重量時即時重算失重

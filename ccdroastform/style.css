@@ -180,7 +180,7 @@ label > *:not(:first-child){ margin-top:6px; }
 .plan-custom-lists--mini .event-list__label{ font-size:13px; white-space:nowrap; flex:0 0 auto; }
 .plan-custom-lists--mini .event-list__del{ flex:0 0 auto; margin-left:auto; }
 
-.setup-footer, .roast-footer, .result-footer{ position:sticky; bottom:0; z-index:5; padding-top:12px; display:flex; flex-direction:column; gap:10px; background:var(--espresso); }
+.setup-footer, .result-footer{ position:sticky; bottom:0; z-index:5; padding-top:12px; display:flex; flex-direction:column; gap:10px; background:var(--espresso); }
 
 .roast-meta{ display:flex; justify-content:space-between; font-size:13px; color:var(--parchment-deep); padding:0 2px; }
 
@@ -213,6 +213,9 @@ label > *:not(:first-child){ margin-top:6px; }
 .event-confirm-item__label{ font-size:13.5px; font-weight:700; color:var(--ink); }
 .event-confirm-item .control-row{ gap:6px; flex-shrink:0; }
 .event-confirm-item .btn{ padding:8px 12px; font-size:12.5px; white-space:nowrap; flex:0 0 auto; }
+.event-confirm-adjust{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.event-confirm-adjust .btn{ width:40px; height:40px; padding:0; font-size:18px; font-weight:900; }
+.event-confirm-value{ min-width:44px; text-align:center; font-family:var(--mono); font-size:18px; font-weight:700; color:var(--ink); }
 
 .adjust-input-row{ display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
 .adjust-step{ width:44px; height:44px; padding:0; font-size:20px; font-weight:900; flex:0 0 auto; }
@@ -259,7 +262,7 @@ label > *:not(:first-child){ margin-top:6px; }
   @page{ size: A4 landscape; margin: 8mm; }
   html, body{ background:#fff; min-height:0; }
   /* 列印時只顯示白底版烘焙紀錄圖（#printExportImage），畫面上的深色面板全部隱藏 */
-  .appbar, .setup-footer, .roast-footer, .result-footer, #screen-setup, #screen-roast, .app-footer-note, .iab-overlay{ display:none !important; }
+  .appbar, .setup-footer, .result-footer, #screen-setup, #screen-roast, .app-footer-note, .iab-overlay{ display:none !important; }
   #screen-result > *{ display:none !important; }
   /* .app／main 原本用 min-height:100vh 撐滿手機畫面，列印時要拿掉，
      不然畫面上方會空出一整頁的高度，把圖片擠到第二頁去 */

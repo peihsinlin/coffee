@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260934">
+<link rel="stylesheet" href="style.css?v=20260935">
 
 <!-- PWA：加到主畫面後可全螢幕、離線開啟。manifest.json 定義名稱／圖示／啟動畫面顏色，
      下面幾個 meta／link 標籤則是讓 iOS（Safari 對 PWA 的支援比較舊式，不看 manifest 裡對應的欄位）
@@ -362,7 +362,7 @@
       <div id="tempPrompt" class="capture-panel" hidden>
         <div class="capture-panel__label" id="tempPromptLabel">請輸入目前溫度</div>
         <form id="tempPromptForm" class="capture-panel__form">
-          <input type="number" inputmode="decimal" id="tempPromptInput" placeholder="°C" required>
+          <input type="number" inputmode="decimal" step="any" id="tempPromptInput" placeholder="°C" required>
           <button type="button" id="btnTempPromptCancel" class="btn btn--outline btn--sm">取消</button>
           <button type="submit" class="btn btn--primary btn--sm">記錄</button>
         </form>
@@ -413,9 +413,6 @@
         </div>
       </div>
 
-      <div class="roast-footer">
-        <button type="button" id="btnFinishRoast" class="btn btn--primary btn--block">結束烘豆，查看結果</button>
-      </div>
     </section>
 
     <!-- 結果頁 -->
@@ -505,6 +502,6 @@
   </main>
 </div>
 
-<script src="script.js?v=20260941"></script>
+<script src="script.js?v=20260942"></script>
 </body>
 </html>

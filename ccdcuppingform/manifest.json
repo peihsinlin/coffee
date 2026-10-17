@@ -1,7 +1,7 @@
 {
-  "name": "杯測小助手",
-  "short_name": "杯測小助手",
-  "description": "C.C.D. 杯測表手機版 · 課堂杯測計時與評分工具",
+  "name": "杯誌 CupLog",
+  "short_name": "杯誌 CupLog",
+  "description": "杯誌 CupLog · 課堂杯測計時與評分工具",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -476,7 +476,7 @@ async function saveAsImage(){
   restore();
 
   const safe = s => (s || '').replace(/[^\w\u4e00-\u9fa5]+/g, '').slice(0, 30);
-  const filename = `CCD杯測表_${safe(state.topic) || '主題'}_${safe(state.name) || '姓名'}_${formatDateForFilename(new Date())}.jpg`;
+  const filename = `杯誌CupLog_${safe(state.topic) || '主題'}_${safe(state.name) || '姓名'}_${formatDateForFilename(new Date())}.jpg`;
 
   canvas.toBlob(async (blob) => {
     if(!blob){

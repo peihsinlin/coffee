@@ -1,4 +1,4 @@
-# 烘豆小助手 Roasting Assistant
+# 烘時機 RoastCue
 
 烘豆計時器暨記錄器。專為手機設計的單頁網頁 App，烘豆時一邊計時、一邊提醒操作、一邊記錄溫度與事件，烘完直接產出曲線圖與摘要，可匯出 JPG 或列印。
 
@@ -95,4 +95,4 @@ Copyright (c) 2026 PEI-HSIN LIN
 
 以 [MIT License](LICENSE.txt) 釋出。
 
-網頁載入的 Noto Serif TC、Noto Sans TC 字型來自 Google Fonts，依 SIL Open Font License 1.1 授權，不在 MIT 條款範圍內。
+網頁載入的 Noto Sans TC、JetBrains Mono 字型來自 Google Fonts，依 SIL Open Font License 1.1 授權，不在 MIT 條款範圍內。

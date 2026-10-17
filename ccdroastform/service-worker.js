@@ -1,5 +1,5 @@
 /*!
- * 烘豆小助手 Roasting Assistant
+ * 烘時機 RoastCue
  * Copyright (c) 2026 PEI-HSIN LIN
  * Licensed under the MIT License. 以 MIT 授權條款釋出，詳見 LICENSE.txt。
  */

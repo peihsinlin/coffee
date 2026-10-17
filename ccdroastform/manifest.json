@@ -1,13 +1,13 @@
 {
-  "name": "烘豆小助手",
-  "short_name": "烘豆小助手",
+  "name": "烘時機 RoastCue",
+  "short_name": "烘時機 RoastCue",
   "description": "烘豆計時器暨記錄器",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#241712",
-  "theme_color": "#241712",
+  "background_color": "#f3f1ef",
+  "theme_color": "#f3f1ef",
   "lang": "zh-Hant-TW",
   "icons": [
     {

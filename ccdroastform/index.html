@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  烘豆小助手 Roasting Assistant
+  烘時機 RoastCue
   Copyright (c) 2026 PEI-HSIN LIN
   Licensed under the MIT License. 以 MIT 授權條款釋出，詳見 LICENSE.txt。
 -->
@@ -9,22 +9,23 @@
 <meta charset="UTF-8">
 <meta name="copyright" content="© 2026 PEI-HSIN LIN. MIT License.">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>烘豆小助手</title>
+<title>烘時機 RoastCue</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260935">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20260937">
 
 <!-- PWA：加到主畫面後可全螢幕、離線開啟。manifest.json 定義名稱／圖示／啟動畫面顏色，
      下面幾個 meta／link 標籤則是讓 iOS（Safari 對 PWA 的支援比較舊式，不看 manifest 裡對應的欄位）
      也能有正確的「加入主畫面」圖示、全螢幕效果與狀態列樣式 -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#241712">
+<meta name="theme-color" content="#f3f1ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1715" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="烘豆小助手">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="烘時機 RoastCue">
 </head>
 <body>
 
@@ -64,7 +65,7 @@
 
 <div class="app">
   <header class="appbar">
-    <span class="appbar__title" id="appbarTitle">烘豆小助手</span>
+    <span class="appbar__title" id="appbarTitle">烘時機 RoastCue</span>
     <span class="appbar__subtitle" id="appbarSubtitle" hidden></span>
   </header>
 
@@ -502,6 +503,6 @@
   </main>
 </div>
 
-<script src="script.js?v=20260944"></script>
+<script src="script.js?v=20260946"></script>
 </body>
 </html>

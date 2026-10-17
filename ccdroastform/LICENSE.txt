@@ -23,8 +23,8 @@ SOFTWARE.
 ---------------------------------------------------------------------
 Third-party notice / 第三方內容聲明
 
-The web page loads the fonts Noto Serif TC and Noto Sans TC from Google Fonts.
+The web page loads the fonts Noto Sans TC and JetBrains Mono from Google Fonts.
 These fonts are licensed under the SIL Open Font License 1.1 and are not
 covered by the license above.
-網頁透過 Google Fonts 載入 Noto Serif TC 與 Noto Sans TC 字型，
+網頁透過 Google Fonts 載入 Noto Sans TC 與 JetBrains Mono 字型，
 該字型依 SIL Open Font License 1.1 授權，不受上述 MIT 條款涵蓋。

@@ -1,5 +1,5 @@
 /*!
- * 烘豆小助手 Roasting Assistant
+ * 烘時機 RoastCue
  * Copyright (c) 2026 PEI-HSIN LIN
  * Licensed under the MIT License. 以 MIT 授權條款釋出，詳見 LICENSE.txt。
  */
@@ -574,16 +574,20 @@ function drawStepChart(ctx, x0, yTop, w, bandH, xScale, fanItems, powerItems, gr
 // 圖表配色主題：dark 是原本畫面／JPG匯出用的深色版，light 是白底版（供列印使用）
 var CHART_THEMES = {
   dark: {
-    bg: '#241712', border: 'rgba(243,232,211,0.14)', gridLine: 'rgba(243,232,211,0.08)',
-    axisText: '#c9b693', labelText: '#F3E9D8', legendText: '#F3E9D8', placeholderText: '#c9b693',
-    bandDry: 'rgba(139,195,74,0.16)', bandMaillard: 'rgba(255,202,58,0.16)', bandDevelopment: 'rgba(224,102,102,0.18)'
+    bg: '#26201d', border: '#3d3430', gridLine: 'rgba(238,230,224,0.08)',
+    axisText: '#a8998f', labelText: '#eee6e0', legendText: '#eee6e0', placeholderText: '#a8998f',
+    bandDry: 'rgba(139,195,74,0.10)', bandMaillard: 'rgba(255,202,58,0.08)', bandDevelopment: 'rgba(224,102,102,0.12)'
   },
   light: {
-    bg: '#ffffff', border: 'rgba(42,33,27,0.20)', gridLine: 'rgba(42,33,27,0.12)',
-    axisText: '#6B5D4F', labelText: '#2A211B', legendText: '#2A211B', placeholderText: '#8a7a68',
+    bg: '#ffffff', border: '#ddd5ce', gridLine: 'rgba(42,35,32,0.10)',
+    axisText: '#76685f', labelText: '#2a2320', legendText: '#2a2320', placeholderText: '#76685f',
     bandDry: 'rgba(139,195,74,0.22)', bandMaillard: 'rgba(255,202,58,0.22)', bandDevelopment: 'rgba(224,102,102,0.20)'
   }
 };
+// 畫面上的曲線圖跟著系統淺色／深色主題；匯出 JPG 與列印固定用 light
+function screenChartTheme(){
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
 
 function renderChart(ctx, x0, y0, w, h, tempLog, triggeredLog, stepBandH, crackEvents, theme, machine){
   var th = CHART_THEMES[theme] || CHART_THEMES.dark;
@@ -832,7 +836,7 @@ function drawLiveCurve(){
   var stepBandH = hasFP ? 90 : 0;
   canvas.style.height = (180 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light', roast.machineName);
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, screenChartTheme(), roast.machineName);
   renderBeanInfoTable('liveBeanInfoBody');
   renderLogTable('liveLogTableBody');
 }
@@ -842,7 +846,7 @@ function drawResultCurve(){
   var stepBandH = hasFP ? 100 : 0;
   canvas.style.height = (260 + stepBandH + (hasFP ? 22 : 0)) + 'px';
   var ctx = resizeCanvas(canvas);
-  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, 'light', roast.machineName);
+  renderChart(ctx, 0, 0, canvas.clientWidth, canvas.clientHeight, roast.tempLog, roast.triggeredLog, stepBandH, roast.crackEvents, screenChartTheme(), roast.machineName);
 }
 
 // ---------- 溫度輸入面板 ----------
@@ -1744,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', function(){
       events: events
     };
 
-    document.getElementById('appbarTitle').textContent = '烘豆小助手';
+    document.getElementById('appbarTitle').textContent = '烘時機 RoastCue';
     var appbarSubtitle = document.getElementById('appbarSubtitle');
     appbarSubtitle.textContent = '目前烘豆機：' + roast.machineName;
     appbarSubtitle.hidden = false;
@@ -2075,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', function(){
   // 開始新的烘焙
   document.getElementById('btnNewRoast').addEventListener('click', function(){
     roast = null;
-    document.getElementById('appbarTitle').textContent = '烘豆小助手';
+    document.getElementById('appbarTitle').textContent = '烘時機 RoastCue';
     var appbarSubtitle = document.getElementById('appbarSubtitle');
     appbarSubtitle.textContent = '';
     appbarSubtitle.hidden = true;
@@ -2153,16 +2157,16 @@ document.addEventListener('DOMContentLoaded', function(){
     var tableH = rowDefs.length * rowH;
 
     // 表格底板（淺色，與畫面上的表格一致）
-    ctx.fillStyle = '#F3E9D8';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(x0, y0, tableW, tableH);
 
     rowDefs.forEach(function(row, ri){
       var ry = y0 + ri * rowH;
 
       // 標題欄（第一欄，列名稱）
-      ctx.fillStyle = '#E8D9BE';
+      ctx.fillStyle = '#f3f1ef';
       ctx.fillRect(x0, ry, labelColW, rowH);
-      ctx.fillStyle = '#2A211B';
+      ctx.fillStyle = '#76685f';
       ctx.font = 'bold 12px sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(row.label, x0 + 8, ry + rowH / 2 + 4);
@@ -2170,22 +2174,22 @@ document.addEventListener('DOMContentLoaded', function(){
       row.cells.forEach(function(cell, ci){
         var cx = x0 + labelColW + ci * colW;
         if (cell.style === 'event'){
-          ctx.fillStyle = 'rgba(139,58,43,0.22)';
+          ctx.fillStyle = '#f2e2dc';
           ctx.fillRect(cx, ry, colW, rowH);
         } else if (cell.crack){
-          ctx.fillStyle = 'rgba(139,58,43,0.10)';
+          ctx.fillStyle = 'rgba(242,226,220,0.5)';
           ctx.fillRect(cx, ry, colW, rowH);
         }
         if (cell.text){
           ctx.textAlign = 'center';
           if (cell.style === 'temp'){
-            ctx.fillStyle = '#96521F'; ctx.font = 'bold 11px monospace';
+            ctx.fillStyle = '#8a3b24'; ctx.font = 'bold 11px monospace';
           } else if (cell.style === 'ror'){
-            ctx.fillStyle = '#8B3A2B'; ctx.font = '11px monospace';
+            ctx.fillStyle = '#76685f'; ctx.font = '11px monospace';
           } else if (cell.style === 'event'){
-            ctx.fillStyle = '#8B3A2B'; ctx.font = 'bold 10px sans-serif';
+            ctx.fillStyle = '#8a3b24'; ctx.font = 'bold 10px sans-serif';
           } else {
-            ctx.fillStyle = '#2A211B'; ctx.font = '11px monospace';
+            ctx.fillStyle = '#2a2320'; ctx.font = '11px monospace';
           }
           ctx.fillText(cell.text, cx + colW / 2, ry + rowH / 2 + 4);
         }
@@ -2193,7 +2197,7 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 
     // 格線
-    ctx.strokeStyle = '#C9B693';
+    ctx.strokeStyle = '#ddd5ce';
     ctx.lineWidth = 1;
     for (var r = 0; r <= rowDefs.length; r++){
       var ly = y0 + r * rowH;
@@ -2222,7 +2226,7 @@ document.addEventListener('DOMContentLoaded', function(){
     ];
     var tableH = rowH * 2;
 
-    ctx.fillStyle = '#F3E9D8';
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(x0, y0, tableW, tableH);
 
     cells.forEach(function(cell, idx){
@@ -2232,7 +2236,7 @@ document.addEventListener('DOMContentLoaded', function(){
       var cy = y0 + row * rowH;
       ctx.textAlign = 'left';
 
-      ctx.fillStyle = '#6B5D4F';
+      ctx.fillStyle = '#76685f';
       ctx.font = '10.5px sans-serif';
       ctx.fillText(cell[0], cx + 8, cy + 17);
 
@@ -2243,11 +2247,11 @@ document.addEventListener('DOMContentLoaded', function(){
         valText = valText.slice(0, -1);
       }
       if (valText !== cell[1]) valText += '…';
-      ctx.fillStyle = '#2A211B';
+      ctx.fillStyle = '#2a2320';
       ctx.fillText(valText, cx + 8, cy + 35);
     });
 
-    ctx.strokeStyle = '#C9B693';
+    ctx.strokeStyle = '#ddd5ce';
     ctx.lineWidth = 1;
     for (var r = 0; r <= 2; r++){
       var ly = y0 + r * rowH;
@@ -2268,8 +2272,8 @@ document.addEventListener('DOMContentLoaded', function(){
   function buildRoastCanvas(theme){
     theme = theme || 'dark';
     var palette = (theme === 'light') ? {
-      pageBg: '#ffffff', title: '#2A211B', subtitle: '#6B5D4F', meta: '#96521F',
-      stat: '#4A3F35', diff: '#8B3A2B', sectionTitle: '#96521F', footer: '#8a7a68', placeholder: '#8a7a68'
+      pageBg: '#ffffff', title: '#2a2320', subtitle: '#76685f', meta: '#8a3b24',
+      stat: '#2a2320', diff: '#8a3b24', sectionTitle: '#8a3b24', footer: '#76685f', placeholder: '#76685f'
     } : {
       pageBg: '#241712', title: '#F3E9D8', subtitle: '#D9C6A3', meta: '#BD6B2E',
       stat: '#D9C6A3', diff: '#8B3A2B', sectionTitle: '#BD6B2E', footer: '#c9b693', placeholder: '#c9b693'
@@ -2368,7 +2372,7 @@ document.addEventListener('DOMContentLoaded', function(){
     ctx.fillStyle = palette.footer;
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('由烘豆小助手匯出', 24, totalH - 16);
+    ctx.fillText('由烘時機 RoastCue 匯出', 24, totalH - 16);
 
     return canvas;
   }
@@ -2404,6 +2408,16 @@ document.addEventListener('DOMContentLoaded', function(){
     }, 'image/jpeg', 0.92);
   });
 
+  // 系統切換淺色／深色時重畫曲線圖
+  if (window.matchMedia){
+    var schemeMq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onScheme = function(){
+      if (!roast) return;
+      if (!document.getElementById('screen-roast').hidden) drawLiveCurve();
+      if (!document.getElementById('screen-result').hidden) drawResultCurve();
+    };
+    if (schemeMq.addEventListener) schemeMq.addEventListener('change', onScheme); else if (schemeMq.addListener) schemeMq.addListener(onScheme);
+  }
   window.addEventListener('resize', function(){
     if (!roast) return;
     if (!document.getElementById('screen-roast').hidden) drawLiveCurve();

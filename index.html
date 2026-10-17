@@ -1,83 +1,114 @@
 <!doctype html>
-<!-- Coffee Apps | Copyright (c) 2026 PEI-HSIN LIN | MIT License -->
+<!-- 咖啡工具系列 Coffee Tools Collection | Copyright (c) 2026 PEI-HSIN LIN | MIT License -->
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>咖啡小工具</title>
-<meta name="description" content="烘豆、杯測、烘焙報告比對的網頁小工具">
-<meta name="theme-color" content="#f3f1ef">
+<title>咖啡工具系列</title>
+<meta name="description" content="烘豆計時、烘焙曲線比較、杯測紀錄的網頁小工具">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1917" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="roastdiff/favicon.svg" type="image/svg+xml">
 <style>
   :root {
-    --bg: #f3f1ef; --panel: #ffffff; --fg: #2a2320; --muted: #76685f; --line: #ddd5ce;
-    --accent: #8a3b24; --accent-soft: #f2e2dc;
+    --bg: #fcfcfb; --fg: #1f1d1b; --muted: #5f5a55; --line: #e6e3df;
+    --c1-bg: #ebe1d3; --c1-ink: #6b4a35;
+    --c2-bg: #e2e5db; --c2-ink: #4f5e45;
+    --c3-bg: #e2e4ec; --c3-ink: #4f5277;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #1b1715; --panel: #26201d; --fg: #eee6e0; --muted: #a8998f; --line: #3d3430;
-      --accent: #e0805f; --accent-soft: #3a2a24;
+      --bg: #1b1917; --fg: #f1ede8; --muted: #a8a19a; --line: #34302c;
+      --c1-bg: #33291f; --c1-ink: #d9b393;
+      --c2-bg: #262c23; --c2-ink: #aebf9f;
+      --c3-bg: #262836; --c3-ink: #aeb2db;
       color-scheme: dark;
     }
   }
   *, *::before, *::after { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
-    font: 15px/1.55 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+    font: 16px/1.5 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   }
   main {
-    max-width: 560px; margin: 0 auto;
-    padding: max(32px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+    max-width: 1100px; margin: 0 auto;
+    padding: max(28px, env(safe-area-inset-top)) 16px max(40px, env(safe-area-inset-bottom));
   }
-  h1 { font-size: 24px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 24px; }
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  header { text-align: center; padding-bottom: 24px; border-bottom: 1px solid var(--line); margin-bottom: 36px; }
+  h1 { font-size: 2rem; font-weight: 700; letter-spacing: .06em; margin: 0; }
+  .en { margin: 6px 0 0; font-size: 1.15rem; letter-spacing: .06em; color: var(--muted); }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   a.app {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px;
-    background: var(--panel); color: inherit; text-decoration: none;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    padding: 26px 16px 24px; border-radius: 16px; color: inherit; text-decoration: none;
+    background: var(--bg-c); transition: transform .15s ease, box-shadow .15s ease;
   }
-  a.app:hover { border-color: var(--accent); background: var(--accent-soft); }
-  a.app:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  a.app img { width: 56px; height: 56px; border-radius: 12px; flex: none; }
-  .name { font-weight: 600; font-size: 17px; }
-  .desc { color: var(--muted); font-size: 14px; }
+  a.app:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0, 0, 0, .08); }
+  a.app:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .c1 { --bg-c: var(--c1-bg); --ink: var(--c1-ink); }
+  .c2 { --bg-c: var(--c2-bg); --ink: var(--c2-ink); }
+  .c3 { --bg-c: var(--c3-bg); --ink: var(--c3-ink); }
+  a.app svg { width: 40px; height: 40px; color: var(--ink); margin-bottom: 14px; }
+  .name { font-size: 1.6rem; font-weight: 700; letter-spacing: .04em; }
+  .name-en { margin-top: 8px; font-size: 1.15rem; letter-spacing: .03em; color: var(--ink); }
+  .tag { margin-top: 8px; font-size: 1.05rem; color: var(--muted); }
+  footer { margin-top: 40px; text-align: center; font-size: .8rem; color: var(--muted); }
+  @media (max-width: 640px) {
+    h1 { font-size: 1.7rem; }
+    .en { font-size: 1rem; }
+    ul { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    a.app { padding: 22px 16px 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) { a.app { transition: none; } a.app:hover { transform: none; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>咖啡小工具</h1>
-  <p class="sub">烘豆、杯測與烘焙報告比對</p>
+  <header>
+    <h1>咖啡工具系列</h1>
+    <p class="en">COFFEE TOOLS COLLECTION</p>
+  </header>
   <ul>
     <li>
-      <a class="app" href="roastdiff/">
-        <img src="roastdiff/icons/icon-192.png" alt="">
-        <span>
-          <span class="name">焙比 RoastDiff</span><br>
-          <span class="desc">讀取 Nucleus Link／Kaffelogic 烘焙報告 PDF，整理表格並對比曲線</span>
-        </span>
+      <a class="app c1" href="ccdroastform/">
+        <!-- stopwatch -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 2h4"/><circle cx="12" cy="14" r="8"/><path d="M12 14V10"/>
+        </svg>
+        <span class="name">烘時機</span>
+        <span class="name-en">RoastCue</span>
+        <span class="tag">計時・提醒</span>
       </a>
     </li>
     <li>
-      <a class="app" href="ccdroastform/">
-        <img src="ccdroastform/icons/icon-192.png" alt="">
-        <span>
-          <span class="name">烘豆小助手</span><br>
-          <span class="desc">烘豆計時器暨記錄器，產出曲線圖與摘要</span>
-        </span>
+      <a class="app c2" href="roastdiff/">
+        <!-- rising line over bars -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 13l5-4.5 4 3L20 4"/><path d="M16 4h4v4"/>
+          <path d="M4 21v-3"/><path d="M8 21v-6"/><path d="M12 21v-4"/><path d="M16 21v-7"/><path d="M20 21v-9"/>
+        </svg>
+        <span class="name">焙比</span>
+        <span class="name-en">RoastDiff</span>
+        <span class="tag">曲線・比較</span>
       </a>
     </li>
     <li>
-      <a class="app" href="ccdcuppingform/">
-        <img src="ccdcuppingform/icons/icon-192.png" alt="">
-        <span>
-          <span class="name">杯誌 CupLog</span><br>
-          <span class="desc">杯測評分表，可分享、自動計分排名、列印</span>
-        </span>
+      <a class="app c3" href="ccdcuppingform/">
+        <!-- notepad with pencil -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M8 2v3"/><path d="M12 2v3"/><path d="M16 2v3"/>
+          <path d="M19 10V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h4"/>
+          <path d="M9 10h6"/><path d="M9 14h4"/>
+          <path d="M19.5 14.5a1.6 1.6 0 0 1 2.3 2.3L17 21.5l-3 .5.5-3z"/>
+        </svg>
+        <span class="name">杯誌</span>
+        <span class="name-en">CupLog</span>
+        <span class="tag">杯測・紀錄</span>
       </a>
     </li>
   </ul>
+  <footer>© 2026 PEI-HSIN LIN · MIT License</footer>
 </main>
 </body>
 </html>

@@ -1271,6 +1271,18 @@ function compute60sRow(cols, isCrackCol){
   });
 }
 
+// 回溫點後「00:00」參考欄要顯示的風門／火力：回溫點附近（20 秒內）實際確認寫入的紀錄優先
+// （提醒確認時可能用 +/- 調整過），沒有紀錄時火力才退回顯示設定頁的範本值
+function resetColValue(prefix, fallback){
+  if (roast.resetAt == null) return fallback || '';
+  var near = roast.triggeredLog.filter(function(ev){
+    return ev.label.indexOf(prefix + ' ') === 0 && Math.abs(ev.t - roast.resetAt) <= 20;
+  });
+  if (!near.length) return fallback || '';
+  var latest = near.reduce(function(a, b){ return a.t >= b.t ? a : b; });
+  return latest.label.slice(prefix.length + 1);
+}
+
 // 事件時間軸欄位：一般用溫度紀錄（tempLog）依時間排序後的每一點當一欄；
 // Mini500 若已經按過「回溫點」，會在回溫點那一欄後面多插入一欄代表「歸零後的 00:00」，
 // 帶入回溫點當下即將生效的火力設定，方便直接看到重新計時後的起點（這欄是展示用，不是真正的溫度紀錄，
@@ -1357,14 +1369,14 @@ function renderLogTable(targetId){
   var windLabel = (roast.machineName === 'Mini500') ? '風門' : '風速';
   var windMap = buildEventColumnMap(cols, roast.triggeredLog, windLabel, 20, roast.resetAt);
   rows += '<tr><th>' + windLabel + '</th>' + cols.map(function(p, i){
-    if (p.synthetic) return '<td></td>';
+    if (p.synthetic) return '<td>' + escapeHtml(resetColValue(windLabel)) + '</td>';
     return '<td' + tdClass(null, p) + '>' + escapeHtml(windMap[i] || '') + '</td>';
   }).join('') + '</tr>';
 
   var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20, roast.resetAt);
   rows += '<tr><th>火力</th>' + cols.map(function(p, i){
     // 回溫點後新增的「00:00」參考欄純粹帶入即將生效的火力值，跟一般欄位一樣的樣式即可，不用特別加粗或標色
-    if (p.synthetic) return '<td>' + escapeHtml(p.power || '') + '</td>';
+    if (p.synthetic) return '<td>' + escapeHtml(resetColValue('火力', p.power)) + '</td>';
     return '<td' + tdClass(null, p) + '>' + escapeHtml(powerMap[i] || '') + '</td>';
   }).join('') + '</tr>';
 
@@ -2116,7 +2128,7 @@ document.addEventListener('DOMContentLoaded', function(){
           var windLabel = (roast.machineName === 'Mini500') ? '風門' : '風速';
           var windMap = buildEventColumnMap(cols, roast.triggeredLog, windLabel, 20, resetAt);
           return cols.map(function(p, i){
-            if (p.synthetic) return { text: '', crack: false };
+            if (p.synthetic) return { text: resetColValue(windLabel), crack: false };
             return { text: windMap[i] || '', crack: crackFlag(p) };
           });
         })() },
@@ -2124,7 +2136,7 @@ document.addEventListener('DOMContentLoaded', function(){
           var powerMap = buildEventColumnMap(cols, roast.triggeredLog, '火力', 20, resetAt);
           return cols.map(function(p, i){
             // 「00:00」參考欄純粹帶入即將生效的火力值，用一般樣式即可，不用加粗或特別標色
-            if (p.synthetic) return { text: p.power || '', crack: false };
+            if (p.synthetic) return { text: resetColValue('火力', p.power), crack: false };
             return { text: powerMap[i] || '', crack: crackFlag(p) };
           });
         })() }

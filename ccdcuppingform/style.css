@@ -282,7 +282,6 @@
   }
   .rc-meta-line b{color:var(--ink);}
   .rc-brand-tag{margin-left:auto;font-weight:700;color:var(--roast);}
-  .rc-attribution{ display:none; }
 
   .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .table-scroll.capture-mode{overflow:visible;}
@@ -324,14 +323,6 @@
   }
   .back-link-on-card{
     color:var(--roast);
-  }
-
-  .page-footer{
-    text-align:center;
-    font-size:13px;
-    color:#9c8a70;
-    letter-spacing:.03em;
-    margin:28px 0 0;
   }
 
   /* floating quick-jump nav — helps navigate a long list of items */
@@ -480,6 +471,5 @@
       box-shadow:none; border:1px solid var(--line);
     }
     .table-scroll{overflow:visible;}
-    .rc-attribution{ display:inline; }
     @page{ size:landscape; margin:8mm; }
   }

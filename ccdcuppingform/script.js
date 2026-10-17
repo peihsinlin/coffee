@@ -449,24 +449,20 @@ async function saveAsImage(){
   const card = document.getElementById('resultCard');
   const scrollWrap = card.querySelector('.table-scroll');
   const table = document.getElementById('rc-table');
-  const attribution = document.getElementById('rc-attribution');
 
   // temporarily expand the card to the table's full natural width so the
-  // capture isn't clipped by the on-screen horizontal-scroll viewport, and
-  // reveal the attribution line (hidden on-screen, shown in exported output)
+  // capture isn't clipped by the on-screen horizontal-scroll viewport
   const prevWidth = card.style.width;
   const prevMaxWidth = card.style.maxWidth;
   scrollWrap.classList.add('capture-mode');
   const fullWidth = table.scrollWidth + 34; // + card's left/right padding
   card.style.maxWidth = 'none';
   card.style.width = fullWidth + 'px';
-  if(attribution) attribution.style.display = 'inline';
 
   const restore = () => {
     card.style.width = prevWidth;
     card.style.maxWidth = prevMaxWidth;
     scrollWrap.classList.remove('capture-mode');
-    if(attribution) attribution.style.display = '';
   };
 
   let canvas;

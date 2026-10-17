@@ -1,0 +1,83 @@
+<!doctype html>
+<!-- Coffee Apps | Copyright (c) 2026 PEI-HSIN LIN | MIT License -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>咖啡小工具</title>
+<meta name="description" content="烘豆、杯測、烘焙報告比對的網頁小工具">
+<meta name="theme-color" content="#f3f1ef">
+<link rel="icon" href="roastdiff/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #f3f1ef; --panel: #ffffff; --fg: #2a2320; --muted: #76685f; --line: #ddd5ce;
+    --accent: #8a3b24; --accent-soft: #f2e2dc;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1715; --panel: #26201d; --fg: #eee6e0; --muted: #a8998f; --line: #3d3430;
+      --accent: #e0805f; --accent-soft: #3a2a24;
+      color-scheme: dark;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.55 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  }
+  main {
+    max-width: 560px; margin: 0 auto;
+    padding: max(32px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  a.app {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px;
+    background: var(--panel); color: inherit; text-decoration: none;
+  }
+  a.app:hover { border-color: var(--accent); background: var(--accent-soft); }
+  a.app:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  a.app img { width: 56px; height: 56px; border-radius: 12px; flex: none; }
+  .name { font-weight: 600; font-size: 17px; }
+  .desc { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>咖啡小工具</h1>
+  <p class="sub">烘豆、杯測與烘焙報告比對</p>
+  <ul>
+    <li>
+      <a class="app" href="roastdiff/">
+        <img src="roastdiff/icons/icon-192.png" alt="">
+        <span>
+          <span class="name">焙比 RoastDiff</span><br>
+          <span class="desc">讀取 Nucleus Link／Kaffelogic 烘焙報告 PDF，整理表格並對比曲線</span>
+        </span>
+      </a>
+    </li>
+    <li>
+      <a class="app" href="ccdroastform/">
+        <img src="ccdroastform/icons/icon-192.png" alt="">
+        <span>
+          <span class="name">烘豆小助手</span><br>
+          <span class="desc">烘豆計時器暨記錄器，產出曲線圖與摘要</span>
+        </span>
+      </a>
+    </li>
+    <li>
+      <a class="app" href="ccdcuppingform/">
+        <img src="ccdcuppingform/icons/icon-192.png" alt="">
+        <span>
+          <span class="name">C.C.D. 杯測表</span><br>
+          <span class="desc">杯測評分表，可分享、自動計分排名、列印</span>
+        </span>
+      </a>
+    </li>
+  </ul>
+</main>
+</body>
+</html>

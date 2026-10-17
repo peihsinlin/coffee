@@ -3,21 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>杯誌 CupLog｜第五波 精品咖啡 80以上+++</title>
+<title>杯誌 CupLog</title>
 
 <!-- PWA：加入主畫面後可全螢幕、離線使用 -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#241712">
+<meta name="theme-color" content="#f3f1ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1715" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="杯誌 CupLog">
 <link rel="icon" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -54,7 +55,7 @@
   <!-- ============ VIEW 1 : 老師設定主題 ============ -->
   <div class="view" id="view-teacher">
     <div class="brand">
-      <p class="kicker">杯誌 CupLog · 第五波 精品咖啡 80以上+++</p>
+      <p class="kicker">杯誌 CupLog</p>
       <h1>杯測評分表</h1>
     </div>
     <div class="card">
@@ -86,9 +87,9 @@
       <p class="topic-display" id="qr-topic-text"></p>
       <div class="qr-wrap"><div id="qrcode"></div></div>
       <p class="center-caption">請用手機掃描上方 QR Code，即可進入本次評分頁面</p>
-      <div class="btn-row" style="margin-top:14px;">
-        <button class="btn btn-outline" style="background:var(--parchment);" onclick="copyScoreLink()" id="copy-link-btn">複製連結</button>
-        <button class="btn btn-outline" style="background:var(--parchment);" onclick="goToScoreDirect()">進入評分頁 →</button>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="copyScoreLink()" id="copy-link-btn">複製連結</button>
+        <button class="btn btn-outline" onclick="goToScoreDirect()">進入評分頁 →</button>
       </div>
       <button class="back-link back-link-on-card" onclick="goView('view-teacher')">← 修改主題／品項</button>
     </div>
@@ -98,7 +99,7 @@
   <!-- ============ VIEW 3 : 學生評分 ============ -->
   <div class="view" id="view-score">
     <div class="brand">
-      <p class="kicker">杯誌 CupLog · 第五波 精品咖啡 80以上+++</p>
+      <p class="kicker">杯誌 CupLog</p>
     </div>
 
     <div class="card">
@@ -115,15 +116,15 @@
       <div id="items-container"></div>
     </div>
 
-    <button class="btn btn-primary" style="margin-top:14px;" onclick="submitScore()">完成評分，產生結果表 →</button>
+    <button class="btn btn-primary btn-submit" onclick="submitScore()">完成評分，產生結果表 →</button>
 
     <div class="item-jump-nav" id="item-jump-nav" aria-label="快速跳至品項"></div>
   </div>
 
   <!-- ============ VIEW 4 : 結果（橫式總表） ============ -->
   <div class="view" id="view-result">
-    <div class="brand" style="margin-bottom:14px;">
-      <p class="kicker">杯誌 CupLog · 第五波 精品咖啡 80以上+++</p>
+    <div class="brand">
+      <p class="kicker">杯誌 CupLog</p>
       <h1>杯測評分表 結果總表</h1>
     </div>
 
@@ -165,12 +166,14 @@
 
     <div class="result-actions">
       <div class="actions-row">
-        <button class="btn btn-outline" style="background:var(--parchment);" onclick="handlePrint()">🖨 列印</button>
+        <button class="btn btn-outline" onclick="handlePrint()">🖨 列印</button>
         <button class="btn btn-primary" onclick="saveAsImage()">⬇ 另存圖片</button>
       </div>
       <button class="back-link" onclick="goView('view-score')">← 返回修改評分</button>
     </div>
   </div>
+
+  <p class="page-footer">© 2026 PEI-HSIN LIN · MIT License</p>
 
 </div>
 

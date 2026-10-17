@@ -36,6 +36,10 @@ function itemTotal(item){
   return validBase + CATEGORY_DEFS.reduce((sum,c)=>sum+item.scores[c.key],0);
 }
 // round to 2dp and drop trailing zeros for display (e.g. 87.5, not 87.50000000000001)
+// item names / notes come from the share link (URL) or user input: escape before putting them in HTML
+function esc(v){
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function formatScore(n){
   return String(Math.round(n * 100) / 100);
 }
@@ -76,15 +80,15 @@ function renderTeacherItemFields(){
       <div class="three-col-row">
         <div class="field field-name-col">
           <label>名稱</label>
-          <input type="text" class="teacher-item-name" value="${item.name}" placeholder="例如：品項${i+1}">
+          <input type="text" class="teacher-item-name" value="${esc(item.name)}" placeholder="例如：品項${i+1}">
         </div>
         <div class="field field-roast-col">
           <label>烘焙度</label>
-          <input type="text" inputmode="decimal" class="teacher-item-roast" value="${item.roast}" placeholder="選填">
+          <input type="text" inputmode="decimal" class="teacher-item-roast" value="${esc(item.roast)}" placeholder="選填">
         </div>
         <div class="field field-base-col">
           <label>起算分</label>
-          <input type="text" inputmode="decimal" class="teacher-item-base" value="${item.baseScore}" placeholder="80">
+          <input type="text" inputmode="decimal" class="teacher-item-base" value="${esc(item.baseScore)}" placeholder="80">
         </div>
       </div>
     `;
@@ -126,7 +130,7 @@ function buildItemBlock(item, idx){
 
   wrap.innerHTML = `
     <div class="item-head">
-      <span class="item-title">${item.name}</span>
+      <span class="item-title">${esc(item.name)}</span>
       <div class="item-right">
         <span class="item-total"><span class="tot-num">${formatScore(itemTotal(item))}</span><small> 分</small></span>
       </div>
@@ -135,17 +139,17 @@ function buildItemBlock(item, idx){
       <div class="two-col-row">
         <div class="field">
           <label class="field-label-strong">風／滋味描述</label>
-          <input type="text" class="in-flavor-note" placeholder="選填" value="${item.flavorNote}">
+          <input type="text" class="in-flavor-note" placeholder="選填" value="${esc(item.flavorNote)}">
         </div>
         <div class="field">
           <label class="field-label-strong">烘焙度 <em>Agtron</em></label>
-          <input type="text" inputmode="decimal" class="in-agtron" placeholder="選填" value="${item.agtron}">
+          <input type="text" inputmode="decimal" class="in-agtron" placeholder="選填" value="${esc(item.agtron)}">
         </div>
       </div>
       ${scoreFieldsHtml}
       <div class="field" style="margin-top:14px;">
         <label>備註（選填）</label>
-        <textarea class="in-item-notes" placeholder="選填">${item.notes}</textarea>
+        <textarea class="in-item-notes" placeholder="選填">${esc(item.notes)}</textarea>
       </div>
     </div>
   `;
@@ -271,7 +275,7 @@ function createSession(){
   const qrEl = document.getElementById('qrcode');
   qrEl.innerHTML = '';
   if(window.QRCode){
-    new QRCode(qrEl, { text:url.toString(), width:220, height:220, colorDark:'#2A211B', colorLight:'#F3E9D8' });
+    new QRCode(qrEl, { text:url.toString(), width:220, height:220, colorDark:'#2a2320', colorLight:'#ffffff' });
   } else {
     qrEl.textContent = 'QR 產生失敗，請確認網路連線';
   }
@@ -377,14 +381,14 @@ function renderResult(){
     const tr = document.createElement('tr');
     if(rank===1) tr.className = 'rank-first-row';
     tr.innerHTML = `
-      <td class="item-name">${item.name}</td>
+      <td class="item-name">${esc(item.name)}</td>
       <td class="rank">${rank}</td>
-      <td>${item.agtron ? item.agtron : '—'}</td>
-      <td class="flavor-note">${item.flavorNote ? item.flavorNote : '—'}</td>
+      <td>${item.agtron ? esc(item.agtron) : '—'}</td>
+      <td class="flavor-note">${item.flavorNote ? esc(item.flavorNote) : '—'}</td>
       <td class="num ${aromaCls}">${aromaV>0?'+':''}${aromaV}</td>
       ${scoredCells}
       <td class="total">${formatScore(total)}</td>
-      <td class="flavor-note">${item.notes ? item.notes : '—'}</td>
+      <td class="flavor-note">${item.notes ? esc(item.notes) : '—'}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -465,15 +469,22 @@ async function saveAsImage(){
     scrollWrap.classList.remove('capture-mode');
   };
 
+  // export in the light theme whatever the device is set to, like the printout
+  const root = document.documentElement, prevTheme = root.getAttribute('data-theme');
+  root.setAttribute('data-theme', 'light');
+  const restoreTheme = () => { if(prevTheme === null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', prevTheme); };
+
   let canvas;
   try {
-    canvas = await html2canvas(card, { backgroundColor:'#F3E9D8', scale:2 });
+    canvas = await html2canvas(card, { backgroundColor:'#ffffff', scale:2 });
   } catch(e){
     restore();
+    restoreTheme();
     alert('另存圖片失敗，請改用「列印」功能另存 PDF。');
     return;
   }
   restore();
+  restoreTheme();
 
   const safe = s => (s || '').replace(/[^\w\u4e00-\u9fa5]+/g, '').slice(0, 30);
   const filename = `杯誌CupLog_${safe(state.topic) || '主題'}_${safe(state.name) || '姓名'}_${formatDateForFilename(new Date())}.jpg`;

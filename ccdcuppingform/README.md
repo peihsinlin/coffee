@@ -67,12 +67,19 @@ vendor.js             第三方套件（QR Code 產生、畫面轉圖片）
 manifest.json         PWA 設定
 service-worker.js     離線快取
 icons/                App 圖示
+LICENSE.txt           授權條款
 ```
 
 修改任何被快取的檔案後，請把 `service-worker.js` 裡的 `CACHE_VERSION` 加一，否則使用者裝置上的舊快取不會更新。
+
+## 授權
+
+Copyright (c) 2026 PEI-HSIN LIN
+
+以 [MIT License](LICENSE.txt) 釋出。
 
 ## 第三方元件
 
 - [QRCode for JavaScript](https://github.com/davidshimjs/qrcodejs)（Kazuhiko Arase，MIT License）
 - [html2canvas](https://html2canvas.hertzen.com/) 1.4.1（Niklas von Hertzen，MIT License）
-- Noto Serif TC、Noto Sans TC 字型（Google Fonts，SIL Open Font License 1.1）
+- Noto Sans TC、JetBrains Mono 字型（Google Fonts，SIL Open Font License 1.1）

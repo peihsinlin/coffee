@@ -90,7 +90,7 @@
 index.html          整個應用程式（HTML、CSS、JavaScript）
 sw.js               Service worker（離線快取）
 site.webmanifest    PWA 設定
-favicon.*、apple-touch-icon.png、icons/   圖示
+favicon.ico、apple-touch-icon.png、icons/   圖示（水彩風格，與杯誌、烘時機同系列）
 LICENSE.txt         授權條款
 ```
 

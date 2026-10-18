@@ -1,7 +1,7 @@
 /*! 焙比 RoastDiff service worker | Copyright (c) 2026 PEI-HSIN LIN | MIT License */
 // Lets Android browsers install the page as an app, and keeps it usable offline once opened:
 // the page itself is fetched network-first; PDF.js and fonts from the CDNs are cached after first use.
-const CACHE = 'roastdiff-v3';
+const CACHE = 'roastdiff-v4';
 const SHELL = ['./', './index.html', './site.webmanifest', './favicon.ico', './apple-touch-icon.png',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-192.png', './icons/icon-maskable-512.png'];
 self.addEventListener('install', e => {

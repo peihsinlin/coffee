@@ -334,10 +334,25 @@ var NLCore = (function () {
         var i = (y * w + x) * 4, r = d[i], b = d[i + 2], wt = b - r;
         if (wt > 40 && !skip[y * w + x]) { if (!cur) { cur = { minR: 255, sw: 0, sy: 0 }; runs.push(cur); } cur.minR = Math.min(cur.minR, r); cur.sw += wt; cur.sy += wt * y; } else cur = null;
       }
+      var prevPx = prev != null ? fy.toPx(prev) : null, darkPx = null;
       runs.forEach(function (rn) {
-        var v = Math.round(fy.toVal(rn.sy / rn.sw));
-        if (rn.minR < 60) { if (dark == null || (prev != null && Math.abs(v - prev) < Math.abs(dark - prev))) dark = v; }
-        else if (light == null) light = v;
+        rn.y = rn.sy / rn.sw;
+        if (rn.minR < 60 && (darkPx == null || (prevPx != null && Math.abs(rn.y - prevPx) < Math.abs(darkPx - prevPx)))) darkPx = rn.y;
+      });
+      // Windows exports draw thinner anti-aliased lines: where the dark curve falls between two pixel rows
+      // none of its pixels reach the dark threshold. A fainter run right where the curve is expected is the curve.
+      if (prevPx != null && (darkPx == null || Math.abs(darkPx - prevPx) > 4)) runs.forEach(function (rn) {
+        if (rn.minR < 120 && Math.abs(rn.y - prevPx) <= 4 && (darkPx == null || Math.abs(rn.y - prevPx) < Math.abs(darkPx - prevPx))) darkPx = rn.y;
+      });
+      if (darkPx != null) dark = Math.round(fy.toVal(darkPx));
+      runs.forEach(function (rn) {
+        if (light != null || rn.minR < 60 || rn.y === darkPx) return;
+        // the faded ends of a dark dash read as light pixels: skip light runs that touch dark pixels nearby
+        for (var xx = x - 2; xx <= x + 2; xx++) for (var yy = Math.round(rn.y) - 3; yy <= Math.round(rn.y) + 3; yy++) {
+          if (xx < 0 || xx >= w) continue;
+          var j = (yy * w + xx) * 4; if (d[j + 2] - d[j] > 40 && d[j] < 60) return;
+        }
+        light = Math.round(fy.toVal(rn.y));
       });
       return { dark: dark, light: light };
     }
@@ -348,7 +363,15 @@ var NLCore = (function () {
         // extrapolate from the last ~5 s: on a steep stretch the curve moves away from the last value faster than
         // a nearly flat line crossing it, so the plain last value would pick the wrong line
         if (base.length >= 2) { var q1 = base[base.length - 1], q0 = base[Math.max(0, base.length - 6)]; prev = q1.v + (q1.v - q0.v) / (q1.t - q0.t) * (t - q1.t); }
-        for (var off = 0; off < 18 && b == null; off++) { var c = colRuns(x0 + (off % 2 ? -1 : 1) * Math.ceil(off / 2), prev); if (c.dark != null) b = c.dark; }
+        // take the nearest column whose dark line is where the curve is expected; a dashed line that crosses
+        // the curve can be the only dark run in some columns, so only fall back to it if no column has the curve
+        var fb = null;
+        for (var off = 0; off < 18 && b == null; off++) {
+          var c = colRuns(x0 + (off % 2 ? -1 : 1) * Math.ceil(off / 2), prev);
+          if (c.dark == null) continue;
+          if (prev == null || Math.abs(fy.toPx(c.dark) - fy.toPx(prev)) <= 8) b = c.dark; else if (fb == null) fb = c.dark;
+        }
+        if (b == null) b = fb;
         for (var o2 = -1; o2 <= 1 && l == null; o2++) { var c2 = colRuns(x0 + o2); if (c2.light != null) l = c2.light; }
         if (b != null) base.push({ t: t, v: b });
         // a light pixel run that sits on the dark line is only its anti-aliased edge (or a marker), not the adjusted curve
@@ -422,7 +445,9 @@ var NLCore = (function () {
     // (or the blended pixels where they overlap) stands in for it.
     function isTemp(r, gg, b) { return r >= 245 && gg < 170 && Math.abs(gg - b) < 12; }
     function tempOcc(r, gg, b) { return (b >= 200 && r < 140 && gg < 140) || (r >= 140 && gg < 70 && b >= 50 && b < 200); }
-    function isRor(r, gg, b) { return r >= 190 && r <= 222 && gg >= 28 && gg <= 80 && Math.abs(gg - b) < 15; }
+    // Windows exports anti-alias the thin ROR line: its pixels range from (204,50,50) to about (230,150,150).
+    // r stays under the pure red temp line's 245+, and red over the grey gridlines never gets this far from grey.
+    function isRor(r, gg, b) { return r >= 190 && r <= 235 && gg >= 28 && r - gg >= 60 && Math.abs(gg - b) < 15; }
     function rorOcc(r, gg, b) { return gg >= 225 && r < 70 && b < 70; }
     var xL = Math.round(g.cols[0]), xR = Math.round(g.cols[g.cols.length - 1]) - 1;
     function trace(pred, occ, seedSec, x0s, x1s, pickTop) {
@@ -431,16 +456,23 @@ var NLCore = (function () {
       var seedX = Math.round(fx.toPx(seedSec)), rs = [];
       for (var sx = seedX; sx < xEnd && !rs.length; sx++) { rs = runs(sx, pred); seedX = sx; }
       if (!rs.length) return [];
-      var pts = {}; pts[seedX] = pickTop ? Math.min.apply(null, rs) : rs[0];
+      // seed: the temp curve is the top red line; the ROR curve is the bottom one (on Windows exports the
+      // temp line's anti-aliased edges, where it crosses the purple raw temp, also pass the ROR colour test)
+      var pts = {}; pts[seedX] = pickTop ? Math.min.apply(null, rs) : Math.max.apply(null, rs);
       function nearest(r, p) { return r.reduce(function (a, b) { return Math.abs(b - p) < Math.abs(a - p) ? b : a; }); }
       function walk(from, to, step) {
-        var p = pts[seedX], gap = 0;
+        var p = pts[seedX], gap = 0, hist = [[seedX, p]];
         for (var x = from; step > 0 ? x <= to : x >= to; x += step) {
           gap++;
-          var r = runs(x, pred), n = r.length ? nearest(r, p) : null;
-          if ((n == null || Math.abs(n - p) > 25) && p < bot - 3) { var o = runs(x, occ); var m = o.length ? nearest(o, p) : null; n = (m != null && Math.abs(m - p) <= Math.min(6 + 2 * gap, 12)) ? m : null; }
+          // where the curve is hidden, expect it where its own visible stretch leads (slope over the last ~10 px
+          // of real line colour): lines crossing under it (e.g. the falling fan-speed line) merge with the profile
+          // curve into one run whose centre drifts off, so following the last hidden value can pick the wrong line
+          var h0 = hist[Math.max(0, hist.length - 10)], h1 = hist[hist.length - 1], e = p;
+          if (h1[0] !== h0[0]) e = h1[1] + Math.max(-3, Math.min(3, (h1[1] - h0[1]) / (h1[0] - h0[0]))) * (x - h1[0]);
+          var r = runs(x, pred), n = r.length ? nearest(r, p) : null, seen = n != null && Math.abs(n - p) <= 25;
+          if ((n == null || Math.abs(n - p) > 25) && p < bot - 3) { var o = runs(x, occ); var m = o.length ? nearest(o, e) : null; n = (m != null && Math.abs(m - e) <= Math.min(6 + 2 * gap, 12)) ? m : null; }
           else if (n != null && Math.abs(n - p) > 25) n = null;
-          if (n != null) { pts[x] = n; p = n; gap = 0; }
+          if (n != null) { pts[x] = n; p = n; gap = 0; if (seen) hist.push([x, n]); }
         }
       }
       walk(seedX + 1, xEnd, 1); walk(seedX - 1, xStart, -1);
